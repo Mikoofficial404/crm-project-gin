@@ -22,7 +22,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Token tidak valid"})
 			return
 		}
-		c.Set("user_id", validateJwt)
+		c.Set("user_id", validateJwt.String())
 		c.Set("role", role)
 		c.Next()
 	}

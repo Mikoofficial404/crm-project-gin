@@ -42,10 +42,16 @@ func main() {
 	authService := service.NewUserService(userRepo)
 	authHandler := v1.NewUserHandler(authService)
 
+	leadRepo := postgres.NewLeadRepository(database.GetDB())
+	leadService := service.NewLeadService(leadRepo)
+	leadHandle := v1.NewLeadHandler(leadService)
+
 	r.POST("/api/v1/register", authHandler.Register)
 	r.POST("/api/v1/login", authHandler.Login)
 	protected := r.Group("/api/v1")
 	protected.Use(middleware.AuthMiddleware())
+	protected.POST("/leads", leadHandle.CreateLeader)
+	protected.GET("/leads", leadHandle.GetLeads)
 	protected.GET("/dashboard", func(c *gin.Context) {
 		userID := c.MustGet("user_id")
 		c.JSON(200, gin.H{"message": "Selamat datang di area rahasia!", "user_id": userID})

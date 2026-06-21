@@ -24,16 +24,25 @@ func (r *LeadRepository) CreateLead(lead *entity.Lead) (*entity.Lead, error) {
 	return lead, nil
 }
 
-func (r *LeadRepository) GetLeadsByUserId(userID string) (*entity.Lead, error) {
+func (r *LeadRepository) GetAllLeads() ([]entity.Lead, error) {
+	var leads []entity.Lead
+	err := r.dbGorm.Find(&leads).Error
+	if err != nil {
+		return nil, err
+	}
+	return leads, nil
+}
+
+func (r *LeadRepository) GetLeadsByUserId(userID string) ([]entity.Lead, error) {
 	ctx := context.Background()
-	var leads entity.Lead
+	var leads []entity.Lead
 	err := r.dbGorm.WithContext(ctx).
 		Where("assigned_to = ?", userID).
 		Find(&leads).Error
 	if err != nil {
 		return nil, err
 	}
-	return &leads, nil
+	return leads, nil
 }
 
 func (r *LeadRepository) UpdateStatus(leadID string, status string) error {
