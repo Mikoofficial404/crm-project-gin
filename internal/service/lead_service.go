@@ -3,6 +3,8 @@ package service
 import (
 	"crm-project/internal/models/entity"
 	"crm-project/internal/repository/postgres"
+	"errors"
+	"fmt"
 )
 
 type LeadService struct {
@@ -37,4 +39,20 @@ func (s *LeadService) GetLeads(userID string, role string) ([]entity.Lead, error
 	} else {
 		return s.lead.GetLeadsByUserId(userID)
 	}
+}
+
+func (s *LeadService) UpdateLeadStatus(leadID string, status string, userID string, role string) error {
+	if leadID == "" || status == "" || userID == "" || role == "" {
+		return errors.New("semua field wajib diisi")
+	}
+	load, err := s.lead.GetLeadByID(leadID)
+	if err != nil {
+		return fmt.Errorf("prospek tidak ditemukan: %w", err)
+	}
+	if role == "sales" {
+		if load.AssignedTo != userID {
+			return errors.New("unauthorized: ini bukan prospek Anda")
+		}
+	}
+	return s.lead.UpdateStatus(leadID, status)
 }

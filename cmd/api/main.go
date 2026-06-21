@@ -52,6 +52,7 @@ func main() {
 	protected.Use(middleware.AuthMiddleware())
 	protected.POST("/leads", leadHandle.CreateLeader)
 	protected.GET("/leads", leadHandle.GetLeads)
+	protected.PATCH("/leads/:id/status", leadHandle.UpdateStatusLeads)
 	protected.GET("/dashboard", func(c *gin.Context) {
 		userID := c.MustGet("user_id")
 		c.JSON(200, gin.H{"message": "Selamat datang di area rahasia!", "user_id": userID})

@@ -17,6 +17,10 @@ func NewLeadHandler(leadService *service.LeadService) *LeadHandler {
 	}
 }
 
+type UpdateStatusReques struct {
+	Status string `json:"status" binding:"required"`
+}
+
 type CreateLeadRequest struct {
 	Name  string `json:"name" binding:"required"`
 	Email string `json:"email" binding:"required,email"`
@@ -47,4 +51,29 @@ func (h *LeadHandler) GetLeads(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "Get Leads", "data": data})
+}
+
+func (h *LeadHandler) UpdateStatusLeads(c *gin.Context) {
+	catchId := c.Param("id")
+	var request struct {
+		Status string `json:"status"`
+	}
+	if catchId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "ID prospek tidak boleh kosong",
+		})
+		return
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	userId := c.MustGet("user_id").(string)
+	role := c.MustGet("role").(string)
+	err := h.leadService.UpdateLeadStatus(catchId, request.Status, userId, role)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusAccepted, gin.H{"status": "update status Leads", "data": gin.H{"id": catchId, "status": request.Status}})
 }

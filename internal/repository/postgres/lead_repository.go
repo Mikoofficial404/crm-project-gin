@@ -54,3 +54,13 @@ func (r *LeadRepository) UpdateStatus(leadID string, status string) error {
 	}
 	return nil
 }
+
+func (r *LeadRepository) GetLeadByID(leadID string) (*entity.Lead, error) {
+	ctx := context.Background()
+	var lead entity.Lead
+	err := r.dbGorm.WithContext(ctx).Where("id = ?", leadID).First(&lead).Error
+	if err != nil {
+		return nil, err
+	}
+	return &lead, nil
+}
