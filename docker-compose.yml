@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  crm-postgres:
+    image: postgres:15-alpine
+    container_name: crm_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: crm_user
+      POSTGRES_PASSWORD: crm_password
+      POSTGRES_DB: crm_db
+    ports:
+      # Port host 5433 karena 5432 sudah dipakai oleh Plane
+      - "5433:5432"
+    volumes:
+      - crm-pg-data:/var/lib/postgresql/data
+    networks:
+      - crm-network
+
+  crm-redis:
+    image: redis:7-alpine
+    container_name: crm_redis
+    restart: always
+    ports:
+      # Port host 6380 karena 6379 sudah dipakai oleh Plane
+      - "6380:6379"
+    volumes:
+      - crm-redis-data:/data
+    networks:
+      - crm-network
+
+volumes:
+  crm-pg-data:
+  crm-redis-data:
+
+networks:
+  crm-network:
+    driver: bridge
