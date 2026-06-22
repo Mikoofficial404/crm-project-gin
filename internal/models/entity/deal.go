@@ -1,6 +1,10 @@
 package entity
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 type Deal struct {
 	ID         string  `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
@@ -11,4 +15,5 @@ type Deal struct {
 	AssignedTo string  `json:"assignedTo" gorm:"type:uuid;not null"`
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+	DeletedAt  gorm.DeletedAt `gorm:"index"`
 }

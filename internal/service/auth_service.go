@@ -64,3 +64,22 @@ func (s *UserService) Login(email string, password string) (string, error) {
 	}
 	return jwtMake, nil
 }
+
+func (s *UserService) ChangePassword(userID string, oldPassword string, newPassword string) error {
+	user, err := s.user.FindByID(userID)
+	if err != nil {
+		return fmt.Errorf("user tidak ditemukan")
+	}
+
+	match, err := jwt.CheckPasswordHash(oldPassword, user.Password)
+	if err != nil || !match {
+		return fmt.Errorf("password lama salah")
+	}
+
+	newHash, err := jwt.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("gagal mengenkripsi password baru")
+	}
+
+	return s.user.UpdatePassword(userID, newHash)
+}

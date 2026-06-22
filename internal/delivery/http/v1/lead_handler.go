@@ -3,6 +3,7 @@ package v1
 import (
 	"crm-project/internal/service"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -45,12 +46,32 @@ func (h *LeadHandler) CreateLeader(c *gin.Context) {
 func (h *LeadHandler) GetLeads(c *gin.Context) {
 	userId := c.MustGet("user_id").(string)
 	role := c.MustGet("role").(string)
-	data, err := h.leadService.GetLeads(userId, role)
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	search := c.Query("search")
+	status := c.Query("status")
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 10
+	}
+
+	data, total, err := h.leadService.GetLeads(userId, role, page, limit, search, status)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "Get Leads", "data": data})
+	c.JSON(http.StatusOK, gin.H{
+		"status": "Get Leads",
+		"data":   data,
+		"meta": gin.H{
+			"page":  page,
+			"limit": limit,
+			"total": total,
+		},
+	})
 }
 
 func (h *LeadHandler) UpdateStatusLeads(c *gin.Context) {
@@ -76,4 +97,22 @@ func (h *LeadHandler) UpdateStatusLeads(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusAccepted, gin.H{"status": "update status Leads", "data": gin.H{"id": catchId, "status": request.Status}})
+}
+
+func (h *LeadHandler) DeleteLead(c *gin.Context) {
+	leadID := c.Param("id")
+	if leadID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID lead tidak boleh kosong"})
+		return
+	}
+
+	userID := c.MustGet("user_id").(string)
+	role := c.MustGet("role").(string)
+
+	err := h.leadService.DeleteLead(leadID, userID, role)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "Lead berhasil dihapus", "data": gin.H{"id": leadID}})
 }

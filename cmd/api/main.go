@@ -39,9 +39,11 @@ func main() {
 
 	r := gin.Default()
 
+	r.Static("/uploads", "./uploads")
+
 	userRepo := postgres.NewUserRepository(database.GetDB())
 	authService := service.NewUserService(userRepo)
-	authHandler := v1.NewUserHandler(authService)
+	authHandler := v1.NewUserHandler(authService, rdb)
 
 	leadRepo := postgres.NewLeadRepository(database.GetDB())
 	leadService := service.NewLeadService(leadRepo)
@@ -58,23 +60,36 @@ func main() {
 	r.POST("/api/v1/register", authHandler.Register)
 	r.POST("/api/v1/login", authHandler.Login)
 	protected := r.Group("/api/v1")
-	protected.Use(middleware.AuthMiddleware())
+	protected.Use(middleware.AuthMiddleware(rdb))
+
+	protected.POST("/logout", authHandler.Logout)
+	protected.PATCH("/profile/password", authHandler.ChangePassword)
+
 	protected.POST("/leads", leadHandle.CreateLeader)
 	protected.GET("/leads", leadHandle.GetLeads)
 	protected.PATCH("/leads/:id/status", leadHandle.UpdateStatusLeads)
+	protected.DELETE("/leads/:id", leadHandle.DeleteLead)
 
 	protected.POST("/deals", dealHandler.CreateDeal)
 	protected.GET("/deals", dealHandler.GetDeals)
 	protected.PATCH("/deals/:id/stage", dealHandler.UpdateStage)
+	protected.DELETE("/deals/:id", dealHandler.DeleteDeal)
 
 	protected.POST("/activities", activityHandler.CreateActivity)
 	protected.GET("/activities/:lead_id", activityHandler.GetActivities)
+	protected.POST("/upload", activityHandler.UploadFile)
 
 	protected.GET("/ws", websocket.ConnectWs)
-	protected.GET("/dashboard", func(c *gin.Context) {
-		userID := c.MustGet("user_id")
-		c.JSON(200, gin.H{"message": "Selamat datang di area rahasia!", "user_id": userID})
-	})
+	dashboardRepo := postgres.NewDashboardRepository(database.GetDB())
+	dashboardService := service.NewDashboardService(dashboardRepo, rdb)
+	dashboardHandler := v1.NewDashboardHandler(dashboardService)
+
+	protected.GET("/dashboard", dashboardHandler.GetDashboardStats)
+
+	// Contoh penggunaan RoleMiddleware untuk rute khusus Admin:
+	// adminGroup := protected.Group("/admin")
+	// adminGroup.Use(middleware.RoleMiddleware("admin"))
+	// adminGroup.GET("/users", func(c *gin.Context) { ... })
 
 	r.Run(":8080")
 
