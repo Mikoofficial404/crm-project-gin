@@ -1,6 +1,7 @@
 package service
 
 import (
+	"crm-project/internal/delivery/websocket"
 	"crm-project/internal/models/entity"
 	"crm-project/internal/repository/postgres"
 	"errors"
@@ -56,6 +57,8 @@ func (s *DealService) UpdateStage(dealID string, status string, userID string, r
 			return errors.New("unauthorized: ini bukan deal Anda")
 		}
 	}
-
+	if status == "WON" {
+		websocket.SendMessageToUser(userID, "SELAMAT! Anda baru saja memenangkan Deal!!")
+	}
 	return s.deal.UpdateStage(dealID, status)
 }

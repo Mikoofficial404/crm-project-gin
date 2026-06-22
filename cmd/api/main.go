@@ -3,6 +3,7 @@ package main
 import (
 	"crm-project/internal/delivery/http/middleware"
 	v1 "crm-project/internal/delivery/http/v1"
+	"crm-project/internal/delivery/websocket"
 	"crm-project/internal/repository/postgres"
 	"crm-project/internal/service"
 	"crm-project/pkg/database"
@@ -68,6 +69,8 @@ func main() {
 
 	protected.POST("/activities", activityHandler.CreateActivity)
 	protected.GET("/activities/:lead_id", activityHandler.GetActivities)
+
+	protected.GET("/ws", websocket.ConnectWs)
 	protected.GET("/dashboard", func(c *gin.Context) {
 		userID := c.MustGet("user_id")
 		c.JSON(200, gin.H{"message": "Selamat datang di area rahasia!", "user_id": userID})

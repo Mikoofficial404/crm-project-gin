@@ -14,12 +14,17 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-func connectWs(c *gin.Context) {
+func ConnectWs(c *gin.Context) {
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade error: %v", err)
 		return
 	}
+	userID := c.MustGet("user_id").(string)
+	AppHub.Clients[userID] = conn
+	defer func() {
+		delete(AppHub.Clients, userID)
+	}()
 	defer conn.Close()
 
 	for {
