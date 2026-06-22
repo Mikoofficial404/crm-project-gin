@@ -7,4 +7,5 @@ type User struct {
 	Password string `json:"password" gorm:"column:password"`
 	Role     string `json:"role" gorm:"column:role"`
 	Lead     []Lead `gorm:"foreignKey:AssignedTo"`
+	Deals    []Deal `gorm:"foreignKey:AssignedTo"`
 }

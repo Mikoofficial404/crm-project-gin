@@ -46,6 +46,14 @@ func main() {
 	leadService := service.NewLeadService(leadRepo)
 	leadHandle := v1.NewLeadHandler(leadService)
 
+	dealRepo := postgres.NewDealRepository(database.GetDB())
+	dealService := service.NewDealService(dealRepo)
+	dealHandler := v1.NewDealHandler(dealService)
+
+	activityRepo := postgres.NewActivityRepository(database.GetDB())
+	activityService := service.NewActivityService(activityRepo)
+	activityHandler := v1.NewAcitivyHandler(activityService)
+
 	r.POST("/api/v1/register", authHandler.Register)
 	r.POST("/api/v1/login", authHandler.Login)
 	protected := r.Group("/api/v1")
@@ -53,6 +61,13 @@ func main() {
 	protected.POST("/leads", leadHandle.CreateLeader)
 	protected.GET("/leads", leadHandle.GetLeads)
 	protected.PATCH("/leads/:id/status", leadHandle.UpdateStatusLeads)
+
+	protected.POST("/deals", dealHandler.CreateDeal)
+	protected.GET("/deals", dealHandler.GetDeals)
+	protected.PATCH("/deals/:id/stage", dealHandler.UpdateStage)
+
+	protected.POST("/activities", activityHandler.CreateActivity)
+	protected.GET("/activities/:lead_id", activityHandler.GetActivities)
 	protected.GET("/dashboard", func(c *gin.Context) {
 		userID := c.MustGet("user_id")
 		c.JSON(200, gin.H{"message": "Selamat datang di area rahasia!", "user_id": userID})
