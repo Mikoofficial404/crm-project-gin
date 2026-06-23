@@ -1,10 +1,12 @@
 package service
 
 import (
+	"crm-project/internal/delivery/websocket"
 	"crm-project/internal/models/entity"
 	"crm-project/internal/repository/postgres"
 	"errors"
 	"fmt"
+	"time"
 )
 
 type LeadService struct {
@@ -31,6 +33,19 @@ func (s *LeadService) CreateLead(name string, email string, phone string, userID
 		return nil, err
 	}
 	return isResult, err
+}
+
+func (s *LeadService) CheckStaleLeads() {
+	leads, _, err := s.lead.GetAllLeads(1, 1000, "", "")
+	if err != nil {
+		return
+	}
+	for _, data := range leads {
+		if data.Status == "NEW" && time.Since(data.CreatedAt).Hours() > 72 {
+			pesan := fmt.Sprintf("Peringatan! Lead prospek bernama %s sudah lebih dari 3 hari belum Anda follow-up!", data.Name)
+			websocket.SendMessageToUser(data.AssignedTo, pesan)
+		}
+	}
 }
 
 func (s *LeadService) GetLeads(userID string, role string, page int, limit int, search string, status string) ([]entity.Lead, int64, error) {
@@ -74,4 +89,9 @@ func (s *LeadService) DeleteLead(leadID string, userID string, role string) erro
 	}
 
 	return s.lead.SoftDeleteLead(leadID)
+}
+
+func (s *LeadService) ImportBulkLeads(leads []entity.Lead) error {
+	_, err := s.lead.CreateBulkLeads(&leads)
+	return err
 }

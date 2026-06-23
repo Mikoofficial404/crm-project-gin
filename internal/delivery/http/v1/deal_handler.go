@@ -3,6 +3,7 @@ package v1
 import (
 	"crm-project/internal/service"
 	"encoding/csv"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -120,15 +121,19 @@ func (h *DealHandler) DeleteDeal(c *gin.Context) {
 func (h *DealHandler) ExportCSC(c *gin.Context) {
 	c.Header("Content-Type", "text/csv")
 	c.Header("Content-Disposition", "attachment;filename=laporan_deals.csv")
-	dealID := c.Param("id")
 	userID := c.MustGet("user_id").(string)
 	role := c.MustGet("role").(string)
-	err := h.dealService.GetDeals(userID)
+	data, _, err := h.dealService.GetDeals(userID, role, 1, 1000, "", "")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	writer := csv.NewWriter(c.Writer)
 	writer.Write([]string{"ID Deal", "Nama Deal", "Nilai (Rp)", "Status Stage"})
-
+	for _, deal := range data {
+		nilaiString := fmt.Sprintf("%.2f", deal.Value)
+		barisData := []string{deal.ID, deal.Name, nilaiString, deal.Stage}
+		writer.Write(barisData)
+	}
+	writer.Flush()
 }

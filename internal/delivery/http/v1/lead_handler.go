@@ -1,7 +1,9 @@
 package v1
 
 import (
+	"crm-project/internal/models/entity"
 	"crm-project/internal/service"
+	"encoding/csv"
 	"net/http"
 	"strconv"
 
@@ -115,4 +117,45 @@ func (h *LeadHandler) DeleteLead(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "Lead berhasil dihapus", "data": gin.H{"id": leadID}})
+}
+
+func (h *LeadHandler) ImportCSV(c *gin.Context) {
+	userID := c.MustGet("user_id").(string)
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	defer src.Close()
+	reader := csv.NewReader(src)
+	records, err := reader.ReadAll()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	var daftarBaru []entity.Lead
+	for i, row := range records {
+		if i == 0 {
+			continue
+		}
+		lead := entity.Lead{
+			Name:       row[0],
+			Email:      row[1],
+			Phone:      row[2],
+			Status:     "NEW",
+			AssignedTo: userID,
+		}
+		daftarBaru = append(daftarBaru, lead)
+	}
+	err = h.leadService.ImportBulkLeads(daftarBaru)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan ratusan data"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"status": "Sukses Import Ratusan Lead!"})
 }

@@ -4,17 +4,24 @@ import (
 	"crm-project/internal/delivery/websocket"
 	"crm-project/internal/models/entity"
 	"crm-project/internal/repository/postgres"
+	"crm-project/internal/worker"
 	"errors"
 	"fmt"
+
+	"github.com/hibiken/asynq"
 )
 
 type DealService struct {
-	deal *postgres.DealRepository
+	deal        *postgres.DealRepository
+	AuditLog    *postgres.AuditRepository
+	AsynqClient *asynq.Client
 }
 
-func NewDealService(dealRepo *postgres.DealRepository) *DealService {
+func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.AuditRepository, asyncClient *asynq.Client) *DealService {
 	return &DealService{
-		deal: dealRepo,
+		deal:        dealRepo,
+		AuditLog:    auditRepo,
+		AsynqClient: asyncClient,
 	}
 }
 
@@ -58,9 +65,30 @@ func (s *DealService) UpdateStage(dealID string, status string, userID string, r
 		}
 	}
 	if status == "WON" {
+		task, errTask := worker.NewEmailDeliveryTask(
+			"klien_anda@gmail.com",
+			"SELAMAT! Deal Anda Berhasil!",
+			"<h1>Terima Kasih!</h1><p>Kami sangat senang bekerja sama dengan Anda.</p>",
+		)
+		if errTask == nil {
+			s.AsynqClient.Enqueue(task)
+		}
 		websocket.SendMessageToUser(userID, "SELAMAT! Anda baru saja memenangkan Deal!!")
 	}
-	return s.deal.UpdateStage(dealID, status)
+
+	errUpdate := s.deal.UpdateStage(dealID, status)
+	if errUpdate != nil {
+		return errUpdate
+	}
+	messages := fmt.Sprintf("Merubah status Deal menjadi %s", status)
+	logData := entity.AuditLog{
+		UserIDAudit: userID,
+		Action:      messages,
+		TargetID:    dealID,
+	}
+
+	s.AuditLog.CreateAuditLog(&logData)
+	return nil
 }
 
 func (s *DealService) DeleteDeal(dealID string, userID string, role string) error {

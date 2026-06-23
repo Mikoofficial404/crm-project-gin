@@ -94,3 +94,12 @@ func (r *LeadRepository) SoftDeleteLead(leadID string) error {
 	err := r.dbGorm.WithContext(ctx).Where("id = ?", leadID).Delete(&entity.Lead{}).Error
 	return err
 }
+
+func (r *LeadRepository) CreateBulkLeads(leadEntity *[]entity.Lead) ([]entity.Lead, error) {
+	csvInsert := r.dbGorm.Create(&leadEntity)
+	err := csvInsert.Error
+	if err != nil {
+		return nil, err
+	}
+	return *leadEntity, nil
+}
