@@ -76,11 +76,15 @@ func main() {
 
 	r.POST("/api/v1/register", authHandler.Register)
 	r.POST("/api/v1/login", middleware.RateLimitMiddleware(rdb), authHandler.Login)
+	r.POST("/api/v1/login/verify-otp", authHandler.VerifyOTP)
+	r.GET("/api/v1/auth/google/login", authHandler.LoginGoogle)
+	r.GET("/api/v1/auth/google/callback", authHandler.CallbackGoogle)
 	protected := r.Group("/api/v1")
 	protected.Use(middleware.AuthMiddleware(rdb))
 
 	protected.POST("/logout", authHandler.Logout)
 	protected.PATCH("/profile/password", authHandler.ChangePassword)
+	protected.GET("/profile/2fa/setup", authHandler.Setup2FA)
 
 	protected.POST("/leads", leadHandle.CreateLeader)
 	protected.POST("/leads/import", leadHandle.ImportCSV)

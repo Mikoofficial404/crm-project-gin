@@ -52,3 +52,14 @@ func (r *UserRepository) UpdatePassword(userID string, hashedPassword string) er
 	err := r.dbGorm.WithContext(ctx).Model(&entity.User{}).Where("id = ?", userID).Update("password", hashedPassword).Error
 	return err
 }
+
+func (r *UserRepository) Update2FA(userID string, secret string) error {
+	ctx := context.Background()
+	user := entity.User{
+		TwoFactorSecret:    secret,
+		IsTwoFactorEnabled: true,
+	}
+	err := r.dbGorm.WithContext(ctx).Model(&entity.User{}).Where("id = ?", userID).Updates(&user).Error
+	return err
+
+}

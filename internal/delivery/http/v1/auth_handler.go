@@ -33,6 +33,11 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required,min=6"`
 }
 
+type VerifyOTPRequest struct {
+	UserID  string `json:"user_id" binding:"required"`
+	OTPCode string `json:"otp_code" binding:"required"`
+}
+
 func (h *UserHandler) Register(c *gin.Context) {
 	var req RegisterRequest
 
@@ -56,13 +61,20 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	data, err := h.userService.Login(req.Email, req.Password)
+	token, userID, requires2FA, err := h.userService.Login(req.Email, req.Password)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"status": "login successful", "data": data})
+	if requires2FA {
+		c.JSON(http.StatusAccepted, gin.H{
+			"message": "OTP Diperlukan! Silakan verifikasi.",
+			"user_id": userID,
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "login sukses", "token": token})
 }
 
 func (h *UserHandler) Logout(c *gin.Context) {
@@ -99,4 +111,47 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "Password berhasil diubah"})
+}
+
+func (h *UserHandler) VerifyOTP(c *gin.Context) {
+	var req VerifyOTPRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	data, err := h.userService.VerifyOTP(req.UserID, req.OTPCode)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"status": "Verifikasi OTP Sukses!",
+		"token":  data,
+	})
+}
+
+func (h *UserHandler) Setup2FA(c *gin.Context) {
+	userID := c.MustGet("user_id").(string)
+	data, err := h.userService.SetUp2FA(userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "SetUp2FA", "data": data})
+}
+
+func (h *UserHandler) LoginGoogle(c *gin.Context) {
+	url := h.userService.GetGoogleLoginURL()
+	c.Redirect(http.StatusTemporaryRedirect, url)
+}
+
+func (h *UserHandler) CallbackGoogle(c *gin.Context) {
+	code := c.Query("code")
+	token, err := h.userService.GoogleCallback(code)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "Token", "token": token})
+
 }
