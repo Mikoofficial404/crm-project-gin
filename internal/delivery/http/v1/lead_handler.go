@@ -45,6 +45,43 @@ func (h *LeadHandler) CreateLeader(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"status": "Lead Created", "data": data})
 }
 
+func (h *LeadHandler) GetTrashedLeads(c *gin.Context) {
+	userID := c.MustGet("user_id").(string)
+	role := c.MustGet("role").(string)
+	data, err := h.leadService.GetTrashedLeads(userID, role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"data": data,
+	})
+}
+func (h *LeadHandler) RestoreLead(c *gin.Context) {
+	id := c.Param("id")
+
+	err := h.leadService.RestoreLead(id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid ID",
+		})
+		return
+	}
+	err = h.leadService.RestoreLead(id)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Lead restored successfully",
+	})
+}
+
 func (h *LeadHandler) GetLeads(c *gin.Context) {
 	userId := c.MustGet("user_id").(string)
 	role := c.MustGet("role").(string)

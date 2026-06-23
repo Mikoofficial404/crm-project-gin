@@ -137,3 +137,14 @@ func (h *DealHandler) ExportCSC(c *gin.Context) {
 	}
 	writer.Flush()
 }
+
+func (h *DealHandler) ExportPDF(c *gin.Context) {
+	dataByte, err := h.dealService.ExportDealsToPDF()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal melukis PDF: " + err.Error()})
+		return
+	}
+	c.Header("Content-Disposition", "attachment; filename=laporan_deals.pdf")
+	c.Header("Content-Type", "application/pdf")
+	c.Data(http.StatusOK, "application/pdf", dataByte)
+}

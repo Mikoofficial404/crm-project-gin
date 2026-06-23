@@ -43,9 +43,9 @@ func main() {
 	r := gin.Default()
 
 	r.Static("/uploads", "./uploads")
-	clientAsynq := asynq.NewClient(asynq.RedisClientOpt{Addr: "localhost:6379"})
+	clientAsynq := asynq.NewClient(asynq.RedisClientOpt{Addr: "localhost:6380"})
 	srvAsynq := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: "localhost:6379"},
+		asynq.RedisClientOpt{Addr: "localhost:6380"},
 		asynq.Config{Concurrency: 10},
 	)
 	mux := asynq.NewServeMux()
@@ -87,11 +87,14 @@ func main() {
 	protected.GET("/leads", leadHandle.GetLeads)
 	protected.PATCH("/leads/:id/status", leadHandle.UpdateStatusLeads)
 	protected.DELETE("/leads/:id", leadHandle.DeleteLead)
+	protected.GET("/leads/trash", leadHandle.GetTrashedLeads)
+	protected.POST("/leads/trash/:id/restore", leadHandle.RestoreLead)
 
 	protected.POST("/deals", dealHandler.CreateDeal)
 	protected.GET("/deals", dealHandler.GetDeals)
 	protected.PATCH("/deals/:id/stage", dealHandler.UpdateStage)
 	protected.DELETE("/deals/:id", dealHandler.DeleteDeal)
+	protected.GET("/deals/export/pdf", dealHandler.ExportPDF)
 
 	protected.POST("/activities", activityHandler.CreateActivity)
 	protected.GET("/activities/:lead_id", activityHandler.GetActivities)

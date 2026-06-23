@@ -103,3 +103,25 @@ func (r *LeadRepository) CreateBulkLeads(leadEntity *[]entity.Lead) ([]entity.Le
 	}
 	return *leadEntity, nil
 }
+
+func (r *LeadRepository) GetTrashedLeads(userID string, role string) (*[]entity.Lead, error) {
+	var leads []entity.Lead
+	query := r.dbGorm.Unscoped().Where("deleted_at IS NOT NULL")
+	if role == "sales" {
+		query = query.Where("assigned_to = ?", userID)
+	}
+	err := query.Find(&leads).Error
+	if err != nil {
+		return nil, err
+	}
+	return &leads, nil
+}
+
+func (r *LeadRepository) RestoreLead(leadID string) error {
+	var leads entity.Lead
+	err := r.dbGorm.Unscoped().Model(&leads).Where("id = ?", leadID).Update("deleted_at", nil).Error
+	if err != nil {
+		return err
+	}
+	return nil
+}

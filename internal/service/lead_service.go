@@ -95,3 +95,19 @@ func (s *LeadService) ImportBulkLeads(leads []entity.Lead) error {
 	_, err := s.lead.CreateBulkLeads(&leads)
 	return err
 }
+
+func (s *LeadService) GetTrashedLeads(userID string, role string) (*[]entity.Lead, error) {
+	leads, err := s.lead.GetTrashedLeads(userID, role)
+	if err != nil {
+		return nil, err
+	}
+	return leads, nil
+}
+
+func (s *LeadService) RestoreLead(leadID string) error {
+	err := s.lead.RestoreLead(leadID)
+	if err != nil {
+		return err
+	}
+	return nil
+}

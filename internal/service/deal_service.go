@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"crm-project/internal/delivery/websocket"
 	"crm-project/internal/models/entity"
 	"crm-project/internal/repository/postgres"
@@ -9,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/hibiken/asynq"
+	"github.com/jung-kurt/gofpdf"
 )
 
 type DealService struct {
@@ -108,4 +110,39 @@ func (s *DealService) DeleteDeal(dealID string, userID string, role string) erro
 	}
 
 	return s.deal.SoftDeleteDeal(dealID)
+}
+
+func (s *DealService) ExportDealsToPDF() ([]byte, error) {
+	data, _, err := s.deal.GetAllDeals(1, 10, "", "")
+	if err != nil {
+		return nil, err
+	}
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.AddPage()
+	pdf.Ln(15)
+
+	pdf.SetFont("Arial", "B", 12)
+	pdf.Cell(60, 10, "Nama Deal")
+	pdf.Cell(60, 10, "Stage")
+	pdf.Cell(50, 10, "Nilai Rp")
+	pdf.Ln(10)
+
+	pdf.SetFont("Arial", "", 11)
+	for _, value := range data {
+		pdf.Cell(60, 10, value.Name)
+		pdf.Cell(60, 10, value.Stage)
+		pdf.Cell(50, 10, formatRupiah(value.Value))
+		pdf.Ln(8)
+	}
+	var buf bytes.Buffer
+	err = pdf.Output(&buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func formatRupiah(amount float64) string {
+	return fmt.Sprintf("Rp %.2f", amount)
 }
