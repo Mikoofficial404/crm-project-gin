@@ -11,6 +11,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/jung-kurt/gofpdf"
+	"github.com/xuri/excelize/v2"
 )
 
 type DealService struct {
@@ -52,6 +53,7 @@ func (s *DealService) GetDeals(userID string, role string, page int, limit int, 
 }
 
 func (s *DealService) UpdateStage(dealID string, status string, userID string, role string) error {
+
 	if dealID == "" || status == "" || userID == "" || role == "" {
 		return errors.New("semua field wajib diisi")
 	}
@@ -77,16 +79,25 @@ func (s *DealService) UpdateStage(dealID string, status string, userID string, r
 		}
 		websocket.SendMessageToUser(userID, "SELAMAT! Anda baru saja memenangkan Deal!!")
 	}
+	dealById, err := s.deal.GetDealByID(dealID)
+	if err != nil {
+		return err
+	}
+
+	oldData := dealById.Stage
 
 	errUpdate := s.deal.UpdateStage(dealID, status)
 	if errUpdate != nil {
 		return errUpdate
 	}
+	newData := status
 	messages := fmt.Sprintf("Merubah status Deal menjadi %s", status)
 	logData := entity.AuditLog{
 		UserIDAudit: userID,
 		Action:      messages,
 		TargetID:    dealID,
+		OldData:     oldData,
+		NewData:     newData,
 	}
 
 	s.AuditLog.CreateAuditLog(&logData)
@@ -110,6 +121,43 @@ func (s *DealService) DeleteDeal(dealID string, userID string, role string) erro
 	}
 
 	return s.deal.SoftDeleteDeal(dealID)
+}
+
+func (s *DealService) ExportDealsToExcel() (*bytes.Buffer, error) {
+	data, _, err := s.deal.GetAllDeals(1, 1000, "", "")
+	if err != nil {
+		return nil, err
+	}
+
+	f := excelize.NewFile()
+
+	headerStyle, _ := f.NewStyle(&excelize.Style{
+		Font:      &excelize.Font{Bold: true, Color: "FFFFFF"},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{"4F81BD"}, Pattern: 1},
+		Alignment: &excelize.Alignment{Horizontal: "center"},
+	})
+
+	f.SetCellValue("Sheet1", "A1", "ID Deal")
+	f.SetCellValue("Sheet1", "B1", "Nama Deal")
+	f.SetCellValue("Sheet1", "C1", "Status Stage")
+	f.SetCellValue("Sheet1", "D1", "Nilai (Rp)")
+	f.SetCellStyle("Sheet1", "A1", "D1", headerStyle)
+	f.SetColWidth("Sheet1", "A", "D", 20)
+
+	for i, deal := range data {
+		row := i + 2
+		f.SetCellValue("Sheet1", fmt.Sprintf("A%d", row), deal.ID)
+		f.SetCellValue("Sheet1", fmt.Sprintf("B%d", row), deal.Name)
+		f.SetCellValue("Sheet1", fmt.Sprintf("C%d", row), deal.Stage)
+		f.SetCellValue("Sheet1", fmt.Sprintf("D%d", row), deal.Value)
+	}
+
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
 }
 
 func (s *DealService) ExportDealsToPDF() ([]byte, error) {

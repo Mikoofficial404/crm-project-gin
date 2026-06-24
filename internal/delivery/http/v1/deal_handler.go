@@ -148,3 +148,15 @@ func (h *DealHandler) ExportPDF(c *gin.Context) {
 	c.Header("Content-Type", "application/pdf")
 	c.Data(http.StatusOK, "application/pdf", dataByte)
 }
+
+func (h *DealHandler) ExportExcel(c *gin.Context) {
+	fileBuffer, err := h.dealService.ExportDealsToExcel()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mencetak Excel: " + err.Error()})
+		return
+	}
+
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", "attachment; filename=laporan_deals.xlsx")
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileBuffer.Bytes())
+}

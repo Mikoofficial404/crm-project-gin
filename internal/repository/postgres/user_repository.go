@@ -63,3 +63,13 @@ func (r *UserRepository) Update2FA(userID string, secret string) error {
 	return err
 
 }
+
+func (r *UserRepository) SearchUsers(keyword string) ([]entity.User, error) {
+	ctx := context.Background()
+	var users []entity.User
+	err := r.dbGorm.WithContext(ctx).Where("name ILIKE ?", "%"+keyword+"%").Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}

@@ -28,7 +28,7 @@ func DBConn() *gorm.DB {
 }
 
 func MigrateDB() error {
-	err := DB.AutoMigrate(&entity.User{}, &entity.Lead{}, &entity.Deal{}, &entity.Activity{})
+	err := DB.AutoMigrate(&entity.User{}, &entity.Lead{}, &entity.Deal{}, &entity.Activity{}, entity.Notification{})
 	if err != nil {
 		return err
 	}

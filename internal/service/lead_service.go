@@ -4,18 +4,25 @@ import (
 	"crm-project/internal/delivery/websocket"
 	"crm-project/internal/models/entity"
 	"crm-project/internal/repository/postgres"
+	"crm-project/internal/worker"
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/hibiken/asynq"
 )
 
 type LeadService struct {
-	lead *postgres.LeadRepository
+	lead        *postgres.LeadRepository
+	user        *postgres.UserRepository
+	AsynqClient *asynq.Client
 }
 
-func NewLeadService(leadRepo *postgres.LeadRepository) *LeadService {
+func NewLeadService(leadRepo *postgres.LeadRepository, userRepo *postgres.UserRepository, asyncClient *asynq.Client) *LeadService {
 	return &LeadService{
-		lead: leadRepo,
+		lead:        leadRepo,
+		user:        userRepo,
+		AsynqClient: asyncClient,
 	}
 }
 
@@ -42,7 +49,16 @@ func (s *LeadService) CheckStaleLeads() {
 	}
 	for _, data := range leads {
 		if data.Status == "NEW" && time.Since(data.CreatedAt).Hours() > 72 {
+			findUser, err := s.user.FindByID(data.AssignedTo)
+			if err != nil {
+				continue
+			}
+			messageToLead := fmt.Sprintf("Halo bos %s, Lead bernama %s belum...", findUser.Name, data.Name)
 			pesan := fmt.Sprintf("Peringatan! Lead prospek bernama %s sudah lebih dari 3 hari belum Anda follow-up!", data.Name)
+			taskEmail, errTask := worker.NewEmailDeliveryTask(findUser.Email, "Peringatan Follow-up", messageToLead)
+			if errTask == nil {
+				s.AsynqClient.Enqueue(taskEmail)
+			}
 			websocket.SendMessageToUser(data.AssignedTo, pesan)
 		}
 	}

@@ -125,3 +125,13 @@ func (r *LeadRepository) RestoreLead(leadID string) error {
 	}
 	return nil
 }
+
+func (r *LeadRepository) SearchLeads(keyword string) ([]entity.Lead, error) {
+	ctx := context.Background()
+	var leads []entity.Lead
+	err := r.dbGorm.WithContext(ctx).Where("name ILIKE ?", "%"+keyword+"%").Find(&leads).Error
+	if err != nil {
+		return nil, err
+	}
+	return leads, nil
+}

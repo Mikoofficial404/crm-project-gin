@@ -61,7 +61,7 @@ func main() {
 	authHandler := v1.NewUserHandler(authService, rdb)
 
 	leadRepo := postgres.NewLeadRepository(database.GetDB())
-	leadService := service.NewLeadService(leadRepo)
+	leadService := service.NewLeadService(leadRepo, userRepo, clientAsynq)
 	leadHandle := v1.NewLeadHandler(leadService)
 
 	dealRepo := postgres.NewDealRepository(database.GetDB())
@@ -73,6 +73,13 @@ func main() {
 	activityRepo := postgres.NewActivityRepository(database.GetDB())
 	activityService := service.NewActivityService(activityRepo)
 	activityHandler := v1.NewAcitivyHandler(activityService)
+
+	notifRepo := postgres.NewNotificationRepository(database.GetDB())
+	notifService := service.NewNotificationService(notifRepo)
+	notifHandler := v1.NewNotificationHandler(notifService)
+
+	searchService := service.NewSearchService(leadRepo, dealRepo, userRepo)
+	searchHandler := v1.NewServiceHandler(searchService)
 
 	r.POST("/api/v1/register", authHandler.Register)
 	r.POST("/api/v1/login", middleware.RateLimitMiddleware(rdb), authHandler.Login)
@@ -99,10 +106,13 @@ func main() {
 	protected.PATCH("/deals/:id/stage", dealHandler.UpdateStage)
 	protected.DELETE("/deals/:id", dealHandler.DeleteDeal)
 	protected.GET("/deals/export/pdf", dealHandler.ExportPDF)
+	protected.GET("/deals/export/excel", dealHandler.ExportExcel)
 
 	protected.POST("/activities", activityHandler.CreateActivity)
 	protected.GET("/activities/:lead_id", activityHandler.GetActivities)
 	protected.POST("/upload", activityHandler.UploadFile)
+
+	protected.GET("/search", searchHandler.GlobalSearch)
 
 	protected.GET("/ws", websocket.ConnectWs)
 	dashboardRepo := postgres.NewDashboardRepository(database.GetDB())
@@ -110,8 +120,11 @@ func main() {
 	dashboardHandler := v1.NewDashboardHandler(dashboardService)
 
 	protected.GET("/deals/export", dealHandler.ExportCSC)
-
 	protected.GET("/dashboard", dashboardHandler.GetDashboardStats)
+	protected.GET("/analytics/forecasting", dashboardHandler.GetAnalytics)
+
+	protected.GET("/notifications", notifHandler.GetMyNotifications)
+	protected.PATCH("/notifications/:id/read", notifHandler.MarkAsRead)
 
 	// adminGroup := protected.Group("/admin")
 	// adminGroup.Use(middleware.RoleMiddleware("admin"))

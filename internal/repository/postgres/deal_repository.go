@@ -94,3 +94,13 @@ func (r *DealRepository) SoftDeleteDeal(dealID string) error {
 	err := r.dbGorm.WithContext(ctx).Where("id = ?", dealID).Delete(&entity.Deal{}).Error
 	return err
 }
+
+func (r *DealRepository) SearchDeals(keyword string) ([]entity.Deal, error) {
+	ctx := context.Background()
+	var deals []entity.Deal
+	err := r.dbGorm.WithContext(ctx).Where("name ILIKE ?", "%"+keyword+"%").Find(&deals).Error
+	if err != nil {
+		return nil, err
+	}
+	return deals, nil
+}

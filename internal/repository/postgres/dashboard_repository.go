@@ -25,28 +25,52 @@ func NewDashboardRepository(db *gorm.DB) *DashboardRepository {
 
 func (r *DashboardRepository) GetStats() (*DashboardStats, error) {
 	stats := &DashboardStats{}
-	
+
 	if err := r.dbGorm.Model(&entity.Lead{}).Count(&stats.TotalLeads).Error; err != nil {
 		return nil, err
 	}
-	
+
 	if err := r.dbGorm.Model(&entity.Deal{}).Count(&stats.TotalDeals).Error; err != nil {
 		return nil, err
 	}
-	
+
 	if err := r.dbGorm.Model(&entity.Deal{}).
 		Where("stage = ?", "WON").
 		Select("COALESCE(SUM(value), 0)").
 		Scan(&stats.TotalRevenueWon).Error; err != nil {
 		return nil, err
 	}
-	
+
 	if err := r.dbGorm.Model(&entity.Deal{}).
 		Where("stage = ?", "PROSPECTING").
 		Select("COALESCE(SUM(value), 0)").
 		Scan(&stats.PotentialRevenue).Error; err != nil {
 		return nil, err
 	}
-	
+
 	return stats, nil
+}
+
+func (r *DashboardRepository) GetTotalRevenue() (float64, error) {
+	var total float64
+	err := r.dbGorm.Model(&entity.Deal{}).Where("stage = ?", "WON").Select("COALESCE(SUM(value), 0)").Scan(&total).Error
+	return total, err
+}
+
+func (r *DashboardRepository) GetProjectedRevenue() (float64, error) {
+	var total float64
+	err := r.dbGorm.Model(&entity.Deal{}).Where("stage IN ?", []string{"PROSPECTING", "NEGOTIATION"}).Select("COALESCE(SUM(value), 0)").Scan(&total).Error
+	return total, err
+}
+
+func (r *DashboardRepository) GetTotalWonDeals() (int64, error) {
+	var total int64
+	err := r.dbGorm.Model(&entity.Deal{}).Where("stage = ?", "WON").Count(&total).Error
+	return total, err
+}
+
+func (r *DashboardRepository) GetTotalLeads() (int64, error) {
+	var total int64
+	err := r.dbGorm.Model(&entity.Lead{}).Count(&total).Error
+	return total, err
 }

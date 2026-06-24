@@ -29,3 +29,14 @@ func (h *DashboardHandler) GetDashboardStats(c *gin.Context) {
 		"data":    stats,
 	})
 }
+
+func (h *DashboardHandler) GetAnalytics(c *gin.Context) {
+	data, err := h.dashboardService.GetForecastingAnalytics()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data dashboard"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"data": data,
+	})
+}
