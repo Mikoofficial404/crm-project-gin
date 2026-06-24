@@ -25,9 +25,10 @@ type UpdateStatusReques struct {
 }
 
 type CreateLeadRequest struct {
-	Name  string `json:"name" binding:"required"`
-	Email string `json:"email" binding:"required,email"`
-	Phone string `json:"phone" binding:"required"`
+	Name         string                 `json:"name" binding:"required"`
+	Email        string                 `json:"email" binding:"required,email"`
+	Phone        string                 `json:"phone" binding:"required"`
+	CustomFields map[string]interface{} `json:"custom_fields" binding:"required"`
 }
 
 func (h *LeadHandler) CreateLeader(c *gin.Context) {
@@ -37,7 +38,7 @@ func (h *LeadHandler) CreateLeader(c *gin.Context) {
 		return
 	}
 	userID := c.MustGet("user_id").(string)
-	data, err := h.leadService.CreateLead(req.Name, req.Email, req.Phone, userID)
+	data, err := h.leadService.CreateLead(req.Name, req.Email, req.Phone, userID, req.CustomFields)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

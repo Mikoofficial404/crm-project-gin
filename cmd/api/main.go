@@ -66,8 +66,9 @@ func main() {
 
 	dealRepo := postgres.NewDealRepository(database.GetDB())
 
+	invoiceRepo := postgres.NewInvoiceRepository(database.GetDB())
 	auditRepo := postgres.NewAuditRepository(database.GetDB())
-	dealService := service.NewDealService(dealRepo, auditRepo, clientAsynq)
+	dealService := service.NewDealService(dealRepo, auditRepo, clientAsynq, invoiceRepo)
 	dealHandler := v1.NewDealHandler(dealService)
 
 	activityRepo := postgres.NewActivityRepository(database.GetDB())
@@ -101,12 +102,13 @@ func main() {
 	protected.GET("/leads/trash", leadHandle.GetTrashedLeads)
 	protected.POST("/leads/trash/:id/restore", leadHandle.RestoreLead)
 
-	protected.POST("/deals", dealHandler.CreateDeal)
+	protected.POST("/dtadeals", dealHandler.CreateDeal)
 	protected.GET("/deals", dealHandler.GetDeals)
 	protected.PATCH("/deals/:id/stage", dealHandler.UpdateStage)
 	protected.DELETE("/deals/:id", dealHandler.DeleteDeal)
 	protected.GET("/deals/export/pdf", dealHandler.ExportPDF)
 	protected.GET("/deals/export/excel", dealHandler.ExportExcel)
+	protected.GET("/deals/:id/invoice", dealHandler.DownloadInvoice)
 
 	protected.POST("/activities", activityHandler.CreateActivity)
 	protected.GET("/activities/:lead_id", activityHandler.GetActivities)

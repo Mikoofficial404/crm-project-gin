@@ -20,6 +20,10 @@ type CreateDealRequest struct {
 	LeadID string  `json:"leadId" binding:"required"`
 }
 
+type ReorderRequest struct {
+	DealIDs []string `json:"deal_ids" binding:"required"`
+}
+
 type UpdateStageRequest struct {
 	Stage string `json:"stage" binding:"required"`
 }
@@ -28,6 +32,20 @@ func NewDealHandler(dealService *service.DealService) *DealHandler {
 	return &DealHandler{
 		dealService: dealService,
 	}
+}
+
+func (h *DealHandler) Reorder(c *gin.Context) {
+	var req ReorderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	err := h.dealService.ReorderDeals(req.DealIDs)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan urutan: " + err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Reorder berhasil"})
 }
 
 func (h *DealHandler) CreateDeal(c *gin.Context) {
@@ -145,6 +163,18 @@ func (h *DealHandler) ExportPDF(c *gin.Context) {
 		return
 	}
 	c.Header("Content-Disposition", "attachment; filename=laporan_deals.pdf")
+	c.Header("Content-Type", "application/pdf")
+	c.Data(http.StatusOK, "application/pdf", dataByte)
+}
+
+func (h *DealHandler) DownloadInvoice(c *gin.Context) {
+	dealID := c.Param("deal_id")
+	dataByte, err := h.dealService.GenerateInvoicePDF(dealID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal melukis PDF: " + err.Error()})
+		return
+	}
+	c.Header("Content-Disposition", "attachment; filename=invoice.pdf")
 	c.Header("Content-Type", "application/pdf")
 	c.Data(http.StatusOK, "application/pdf", dataByte)
 }

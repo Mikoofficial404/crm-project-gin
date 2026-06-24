@@ -18,13 +18,15 @@ type DealService struct {
 	deal        *postgres.DealRepository
 	AuditLog    *postgres.AuditRepository
 	AsynqClient *asynq.Client
+	invoiceRepo *postgres.InvoiceRepository
 }
 
-func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.AuditRepository, asyncClient *asynq.Client) *DealService {
+func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.AuditRepository, asyncClient *asynq.Client, invoiceRepo *postgres.InvoiceRepository) *DealService {
 	return &DealService{
 		deal:        dealRepo,
 		AuditLog:    auditRepo,
 		AsynqClient: asyncClient,
+		invoiceRepo: invoiceRepo,
 	}
 }
 
@@ -78,6 +80,24 @@ func (s *DealService) UpdateStage(dealID string, status string, userID string, r
 			s.AsynqClient.Enqueue(task)
 		}
 		websocket.SendMessageToUser(userID, "SELAMAT! Anda baru saja memenangkan Deal!!")
+		subTotal := deal.Value
+		pajakPpn := subTotal * 0.11
+		total := subTotal + pajakPpn
+		var InvoiceNo string
+		InvoiceNo = "INV"
+		wrapTeks := fmt.Sprintf("%s-%s", InvoiceNo, dealID)
+		invoice := entity.Invoice{
+			InvoiceNo:  wrapTeks,
+			DealID:     dealID,
+			SubTotal:   subTotal,
+			GrandTotal: total,
+			Tax:        pajakPpn,
+			Status:     "UNPAID",
+		}
+		_, err := s.invoiceRepo.CreateInvoice(&invoice)
+		if err != nil {
+			return err
+		}
 	}
 	dealById, err := s.deal.GetDealByID(dealID)
 	if err != nil {
@@ -160,6 +180,55 @@ func (s *DealService) ExportDealsToExcel() (*bytes.Buffer, error) {
 	return buf, nil
 }
 
+func (s *DealService) GenerateInvoicePDF(dealID string) ([]byte, error) {
+
+	invoice, err := s.invoiceRepo.GetInvoiceByDealID(dealID)
+	if err != nil {
+		return nil, fmt.Errorf("invoice tidak ditemukan: %w", err)
+	}
+
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.AddPage()
+
+	pdf.SetFont("Arial", "B", 16)
+	pdf.CellFormat(0, 10, "INVOICE TAGIHAN", "", 1, "C", false, 0, "")
+	pdf.Ln(10)
+
+	pdf.SetFont("Arial", "B", 11)
+	pdf.Cell(60, 10, "Nomor Invoice")
+	pdf.SetFont("Arial", "", 11)
+	pdf.Cell(0, 10, invoice.InvoiceNo)
+	pdf.Ln(8)
+
+	pdf.SetFont("Arial", "B", 11)
+	pdf.Cell(60, 10, "Harga Awal (SubTotal)")
+	pdf.SetFont("Arial", "", 11)
+	pdf.Cell(0, 10, fmt.Sprintf("Rp %.2f", invoice.SubTotal))
+	pdf.Ln(8)
+
+	pdf.SetFont("Arial", "B", 11)
+	pdf.Cell(60, 10, "Pajak PPN (11%)")
+	pdf.SetFont("Arial", "", 11)
+	pdf.Cell(0, 10, fmt.Sprintf("Rp %.2f", invoice.Tax))
+	pdf.Ln(8)
+
+	pdf.SetFont("Arial", "B", 11)
+	pdf.Cell(60, 10, "Grand Total")
+	pdf.SetFont("Arial", "", 11)
+	pdf.Cell(0, 10, fmt.Sprintf("Rp %.2f", invoice.GrandTotal))
+	pdf.Ln(20)
+
+	pdf.SetFont("Arial", "I", 10)
+	pdf.CellFormat(0, 10, "Harap transfer segera ke Rekening BCA 123456", "", 1, "C", false, 0, "")
+
+	var buf bytes.Buffer
+	err = pdf.Output(&buf)
+	if err != nil {
+		return nil, fmt.Errorf("gagal generate PDF: %w", err)
+	}
+
+	return buf.Bytes(), nil
+}
 func (s *DealService) ExportDealsToPDF() ([]byte, error) {
 	data, _, err := s.deal.GetAllDeals(1, 10, "", "")
 	if err != nil {
@@ -193,4 +262,8 @@ func (s *DealService) ExportDealsToPDF() ([]byte, error) {
 
 func formatRupiah(amount float64) string {
 	return fmt.Sprintf("Rp %.2f", amount)
+}
+
+func (s *DealService) ReorderDeals(dealIDs []string) error {
+	return s.deal.UpdateDealPositions(dealIDs)
 }

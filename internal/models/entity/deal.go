@@ -13,6 +13,7 @@ type Deal struct {
 	Stage      string  `json:"stage" gorm:"size:20;not null;default:PROSPECTING"`
 	LeadID     string  `json:"leadId" gorm:"type:uuid;not null"`
 	AssignedTo string  `json:"assignedTo" gorm:"type:uuid;not null"`
+	Position   int     `json:"position" gorm:"column:position"`
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 	DeletedAt  gorm.DeletedAt `gorm:"index"`

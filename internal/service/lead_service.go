@@ -26,13 +26,14 @@ func NewLeadService(leadRepo *postgres.LeadRepository, userRepo *postgres.UserRe
 	}
 }
 
-func (s *LeadService) CreateLead(name string, email string, phone string, userID string) (*entity.Lead, error) {
+func (s *LeadService) CreateLead(name string, email string, phone string, userID string, customFields map[string]interface{}) (*entity.Lead, error) {
 	lead := entity.Lead{
-		Name:       name,
-		Email:      email,
-		Phone:      phone,
-		Status:     "NEW",
-		AssignedTo: userID,
+		Name:         name,
+		Email:        email,
+		Phone:        phone,
+		Status:       "NEW",
+		AssignedTo:   userID,
+		CustomFields: customFields,
 	}
 
 	isResult, err := s.lead.CreateLead(&lead)
@@ -59,7 +60,16 @@ func (s *LeadService) CheckStaleLeads() {
 			if errTask == nil {
 				s.AsynqClient.Enqueue(taskEmail)
 			}
+			admins, err := s.user.GetAdmins()
+			for _, admin := range admins {
+				message := fmt.Sprintf("Peringatan Klien VIP Bernama %s telah ditelantarkan oleh Sale %s selama 3 hari!", admin.Name, findUser.Name)
+				websocket.SendMessageToUser(admin.Email, message)
+			}
 			websocket.SendMessageToUser(data.AssignedTo, pesan)
+		}
+		err = s.lead.UpdateStatus(data.ID, "ESCALATED")
+		if err != nil {
+			continue
 		}
 	}
 }

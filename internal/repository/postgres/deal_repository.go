@@ -49,7 +49,7 @@ func (r *DealRepository) GetAllDeals(page int, limit int, search string, stage s
 	query.Count(&total)
 
 	offset := (page - 1) * limit
-	err := query.Offset(offset).Limit(limit).Order("created_at DESC").Find(&deals).Error
+	err := query.Offset(offset).Limit(limit).Order("position ASC").Find(&deals).Error
 	if err != nil {
 		return nil, 0, err
 	}
@@ -72,7 +72,7 @@ func (r *DealRepository) GetDealByUserId(userId string, page int, limit int, sea
 	query.Count(&total)
 
 	offset := (page - 1) * limit
-	err := query.Offset(offset).Limit(limit).Order("created_at DESC").Find(&deals).Error
+	err := query.Offset(offset).Limit(limit).Order("position ASC").Find(&deals).Error
 	if err != nil {
 		return nil, 0, err
 	}
@@ -103,4 +103,16 @@ func (r *DealRepository) SearchDeals(keyword string) ([]entity.Deal, error) {
 		return nil, err
 	}
 	return deals, nil
+}
+
+func (r *DealRepository) UpdateDealPositions(dealIDs []string) error {
+	tx := r.dbGorm.Begin()
+	for index, id := range dealIDs {
+		err := tx.Model(&entity.Deal{}).Where("id = ?", id).Update("position", index).Error
+		if err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit().Error
 }

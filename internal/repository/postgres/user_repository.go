@@ -73,3 +73,13 @@ func (r *UserRepository) SearchUsers(keyword string) ([]entity.User, error) {
 	}
 	return users, nil
 }
+
+func (r *UserRepository) GetAdmins() ([]entity.User, error) {
+	ctx := context.Background()
+	var users []entity.User
+	err := r.dbGorm.WithContext(ctx).Where("role = ?", "admin").Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
