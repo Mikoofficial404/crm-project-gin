@@ -9,6 +9,7 @@ import (
 	"crm-project/internal/worker"
 	"crm-project/pkg/database"
 	"log"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
@@ -88,14 +89,16 @@ func main() {
 	r.GET("/api/v1/auth/google/callback", authHandler.CallbackGoogle)
 
 	waService := service.NewWhatsAppService(
-		"https://gowa-83.semutssh.app",
-		"e6e2a850-c220-42f9-85da-b666c75a0ad2",
-		"user991uia:pass2le4jt",
+		os.Getenv("WA_GOWA_URL"),
+		os.Getenv("WA_DEVICE_ID"),
+		os.Getenv("WA_BASIC_AUTH"),
 	)
+
+	aiService := service.NewAIService(os.Getenv("GEMINI_API_KEY"))
 
 	leadHandle := v1.NewLeadHandler(leadService, leadRepo, waService, activityService)
 
-	webhookHandler := v1.NewWebhookHandler(leadService, waService, userRepo, leadRepo, activityService, notifService)
+	webhookHandler := v1.NewWebhookHandler(leadService, waService, userRepo, leadRepo, activityService, notifService, rdb, aiService)
 	r.POST("/api/v1/webhook/whatsapp", webhookHandler.ReceiveWhatsApp)
 	protected := r.Group("/api/v1")
 	protected.Use(middleware.AuthMiddleware(rdb))

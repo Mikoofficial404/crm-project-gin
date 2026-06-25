@@ -84,6 +84,15 @@ func (r *UserRepository) GetAdmins() ([]entity.User, error) {
 	return users, nil
 }
 
+func (r *UserRepository) GetAllUsers() ([]entity.User, error) {
+	var users []entity.User
+	result := r.dbGorm.Find(&users)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return users, nil
+}
+
 func (r *UserRepository) GetFirstUser() (*entity.User, error) {
 	ctx := context.Background()
 	var user entity.User

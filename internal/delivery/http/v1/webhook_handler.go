@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"context"
 	"crm-project/internal/delivery/websocket"
 	"crm-project/internal/repository/postgres"
 	"crm-project/internal/service"
@@ -8,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
 type GowaWebhookPayload struct {
@@ -27,6 +29,8 @@ type WebhookHandler struct {
 	leadRepo    *postgres.LeadRepository
 	activitySvc *service.ActivityService
 	notifSvc    *service.NotificationService
+	redisClien  *redis.Client
+	aiService   *service.AIService
 }
 
 func NewWebhookHandler(
@@ -36,6 +40,8 @@ func NewWebhookHandler(
 	leadRepo *postgres.LeadRepository,
 	activitySvc *service.ActivityService,
 	notifSvc *service.NotificationService,
+	redisClients *redis.Client,
+	aiService *service.AIService,
 ) *WebhookHandler {
 	return &WebhookHandler{
 		leadService: leadService,
@@ -44,6 +50,8 @@ func NewWebhookHandler(
 		leadRepo:    leadRepo,
 		activitySvc: activitySvc,
 		notifSvc:    notifSvc,
+		redisClien:  redisClients,
+		aiService:   aiService,
 	}
 }
 
@@ -66,26 +74,34 @@ func (h *WebhookHandler) ReceiveWhatsApp(c *gin.Context) {
 	existingLead, _ := h.leadRepo.GetLeadByPhone(phone)
 	if existingLead == nil {
 		fmt.Println("[Webhook Klien baru terdeteksi! Membuat Lead otomatis...")
-
-		admins, _ := h.userRepo.GetAdmins()
-		assigneeID := ""
-		if len(admins) > 0 {
-			assigneeID = admins[0].ID
-		} else {
-			firstUser, _ := h.userRepo.GetFirstUser()
-			if firstUser != nil {
-				assigneeID = firstUser.ID
-			} else {
-				assigneeID = "00000000-0000-0000-0000-000000000000"
-			}
-		}
-
-		_, err := h.leadService.CreateLead(payload.Payload.FromName, "", phone, assigneeID, nil)
+		salesAll, err := h.userRepo.GetAllUsers()
 		if err != nil {
+			fmt.Println("Error", err)
+		}
+		turnNo, err := h.redisClien.Get(context.Background(), "sales_turn_index").Int()
+		if err != nil {
+			turnNo = 0
+		}
+		assigneedID := salesAll[turnNo].ID
+		var newNo int
+		newNo = turnNo + 1
+		if newNo >= len(salesAll) {
+			newNo = 0
+		}
+		h.redisClien.Set(context.Background(), "sales_turn_index", newNo, 0)
+		_, errCreate := h.leadService.CreateLead(payload.Payload.FromName, "", phone, assigneedID, nil)
+		if errCreate != nil {
 			fmt.Println("Gagal membuat Lead otomatis:", err)
 		} else {
-			pesan := fmt.Sprintf("Mas %s! PENGEN MACBOOK AH elah", payload.Payload.FromName)
-			go h.waService.SendWA(phone, pesan)
+			go func() {
+				aiReply, errAi := h.aiService.GenerateSalesReply(payload.Payload.FromName, payload.Payload.Body)
+				if errAi != nil {
+					fmt.Println("[AI Error]:", errAi)
+					h.waService.SendWA(phone, "Terima kasih telah menghubungi kami. Tim kami akan segera membalas pesan Anda.")
+				} else {
+					h.waService.SendWA(phone, aiReply)
+				}
+			}()
 		}
 	} else {
 		fmt.Printf("[Webhook] 👤 Klien Lama (%s) mengirim pesan.\n", existingLead.Name)
@@ -116,6 +132,7 @@ func (h *WebhookHandler) ReceiveWhatsApp(c *gin.Context) {
 			} else {
 				fmt.Println("Sinyal WebSocket berhasil ditembakkan ke layar!")
 			}
+
 		}
 	}
 
