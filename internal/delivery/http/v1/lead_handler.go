@@ -2,8 +2,10 @@ package v1
 
 import (
 	"crm-project/internal/models/entity"
+	"crm-project/internal/repository/postgres"
 	"crm-project/internal/service"
 	"encoding/csv"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -11,17 +13,27 @@ import (
 )
 
 type LeadHandler struct {
-	leadService *service.LeadService
+	leadService    *service.LeadService
+	leadRepository *postgres.LeadRepository
+	waService      *service.WhatsAppService
+	activtyService *service.ActivityService
 }
 
-func NewLeadHandler(leadService *service.LeadService) *LeadHandler {
+func NewLeadHandler(leadService *service.LeadService, leadRepo *postgres.LeadRepository, waServ *service.WhatsAppService, activityServ *service.ActivityService) *LeadHandler {
 	return &LeadHandler{
-		leadService: leadService,
+		leadService:    leadService,
+		leadRepository: leadRepo,
+		waService:      waServ,
+		activtyService: activityServ,
 	}
 }
 
 type UpdateStatusReques struct {
 	Status string `json:"status" binding:"required"`
+}
+
+type SendReplyRequest struct {
+	Message string `json:"message" binding:"required"`
 }
 
 type CreateLeadRequest struct {
@@ -155,6 +167,40 @@ func (h *LeadHandler) DeleteLead(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "Lead berhasil dihapus", "data": gin.H{"id": leadID}})
+}
+
+func (h *LeadHandler) ReplyWhatsApp(c *gin.Context) {
+	idMessage := c.Param("id")
+	if idMessage == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID lead tidak boleh kosong"})
+		return
+	}
+	var req SendReplyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	idSales, exists := c.Get("user_id")
+	idSalesStr := idSales.(string)
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	lead, err := h.leadRepository.GetLeadByID(idMessage)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "lead not found"})
+		return
+	}
+	clientHandphone := lead.Phone
+	go func() {
+		err := h.waService.SendWA(clientHandphone, req.Message)
+		if err != nil {
+			log.Println("failed to send message:", err)
+		}
+	}()
+	activites, err := h.activtyService.CreateActivity("WhatsApp", req.Message, lead.ID, idSalesStr)
+	c.JSON(http.StatusOK, gin.H{"status: ": "Pesan Wa terima", "Aktifitas": activites})
 }
 
 func (h *LeadHandler) ImportCSV(c *gin.Context) {

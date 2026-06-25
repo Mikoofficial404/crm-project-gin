@@ -83,3 +83,13 @@ func (r *UserRepository) GetAdmins() ([]entity.User, error) {
 	}
 	return users, nil
 }
+
+func (r *UserRepository) GetFirstUser() (*entity.User, error) {
+	ctx := context.Background()
+	var user entity.User
+	err := r.dbGorm.WithContext(ctx).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}

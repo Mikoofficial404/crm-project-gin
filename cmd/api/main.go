@@ -62,7 +62,6 @@ func main() {
 
 	leadRepo := postgres.NewLeadRepository(database.GetDB())
 	leadService := service.NewLeadService(leadRepo, userRepo, clientAsynq)
-	leadHandle := v1.NewLeadHandler(leadService)
 
 	dealRepo := postgres.NewDealRepository(database.GetDB())
 
@@ -87,6 +86,17 @@ func main() {
 	r.POST("/api/v1/login/verify-otp", authHandler.VerifyOTP)
 	r.GET("/api/v1/auth/google/login", authHandler.LoginGoogle)
 	r.GET("/api/v1/auth/google/callback", authHandler.CallbackGoogle)
+
+	waService := service.NewWhatsAppService(
+		"https://gowa-83.semutssh.app",
+		"e6e2a850-c220-42f9-85da-b666c75a0ad2",
+		"user991uia:pass2le4jt",
+	)
+
+	leadHandle := v1.NewLeadHandler(leadService, leadRepo, waService, activityService)
+
+	webhookHandler := v1.NewWebhookHandler(leadService, waService, userRepo, leadRepo, activityService, notifService)
+	r.POST("/api/v1/webhook/whatsapp", webhookHandler.ReceiveWhatsApp)
 	protected := r.Group("/api/v1")
 	protected.Use(middleware.AuthMiddleware(rdb))
 
@@ -128,6 +138,8 @@ func main() {
 	protected.GET("/notifications", notifHandler.GetMyNotifications)
 	protected.PATCH("/notifications/:id/read", notifHandler.MarkAsRead)
 
+	protected.POST("/api/v1/leads/:id/reply", leadHandle.ReplyWhatsApp)
+
 	// adminGroup := protected.Group("/admin")
 	// adminGroup.Use(middleware.RoleMiddleware("admin"))
 	// adminGroup.GET("/users", func(c *gin.Context) { ... })
@@ -139,7 +151,5 @@ func main() {
 		leadService.CheckStaleLeads()
 	})
 	c.Start()
-
 	r.Run(":8080")
-
 }

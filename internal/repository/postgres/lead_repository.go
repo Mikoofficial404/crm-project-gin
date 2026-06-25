@@ -89,6 +89,16 @@ func (r *LeadRepository) GetLeadByID(leadID string) (*entity.Lead, error) {
 	return &lead, nil
 }
 
+func (r *LeadRepository) GetLeadByPhone(phone string) (*entity.Lead, error) {
+	ctx := context.Background()
+	var lead entity.Lead
+	err := r.dbGorm.WithContext(ctx).Where("phone LIKE ?", "%"+phone+"%").First(&lead).Error
+	if err != nil {
+		return nil, err
+	}
+	return &lead, nil
+}
+
 func (r *LeadRepository) SoftDeleteLead(leadID string) error {
 	ctx := context.Background()
 	err := r.dbGorm.WithContext(ctx).Where("id = ?", leadID).Delete(&entity.Lead{}).Error
