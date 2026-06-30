@@ -35,3 +35,25 @@ func (r *ActivityRepository) GetActivitiesByLeadID(leadId string) ([]entity.Acti
 	}
 	return activity, nil
 }
+
+func (r *ActivityRepository) GetActivityByID(id string) (*entity.Activity, error) {
+	ctx := context.Background()
+	var activity entity.Activity
+	err := r.dbGorm.WithContext(ctx).Where("id = ?", id).First(&activity).Error
+	if err != nil {
+		return nil, err
+	}
+	return &activity, nil
+}
+
+func (r *ActivityRepository) UpdateActivity(id string, notes string) error {
+	ctx := context.Background()
+	err := r.dbGorm.WithContext(ctx).Model(&entity.Activity{}).Where("id = ?", id).Update("notes", notes).Error
+	return err
+}
+
+func (r *ActivityRepository) DeleteActivity(id string) error {
+	ctx := context.Background()
+	err := r.dbGorm.WithContext(ctx).Where("id = ?", id).Delete(&entity.Activity{}).Error
+	return err
+}

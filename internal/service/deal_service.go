@@ -72,7 +72,7 @@ func (s *DealService) UpdateStage(dealID string, status string, userID string, r
 	}
 	if status == "WON" {
 		task, errTask := worker.NewEmailDeliveryTask(
-			"klien_anda@gmail.com",
+			"klien@gmail.com",
 			"SELAMAT! Deal Anda Berhasil!",
 			"<h1>Terima Kasih!</h1><p>Kami sangat senang bekerja sama dengan Anda.</p>",
 		)
@@ -266,4 +266,38 @@ func formatRupiah(amount float64) string {
 
 func (s *DealService) ReorderDeals(dealIDs []string) error {
 	return s.deal.UpdateDealPositions(dealIDs)
+}
+
+func (s *DealService) UpdateDeal(dealID string, name string, value float64, userID string, role string) error {
+	if dealID == "" || name == "" {
+		return errors.New("id dan nama deal wajib diisi")
+	}
+
+	deal, err := s.deal.GetDealByID(dealID)
+	if err != nil {
+		return fmt.Errorf("deal tidak ditemukan: %w", err)
+	}
+
+	if role == "sales" {
+		if deal.AssignedTo != userID {
+			return errors.New("unauthorized: ini bukan deal Anda")
+		}
+	}
+
+	errUpdate := s.deal.UpdateDeal(dealID, name, value)
+	if errUpdate != nil {
+		return errUpdate
+	}
+
+	messages := fmt.Sprintf("Mengubah data Deal (Nama: %s, Value: %.2f)", name, value)
+	logData := entity.AuditLog{
+		UserIDAudit: userID,
+		Action:      messages,
+		TargetID:    dealID,
+		OldData:     deal.Name,
+		NewData:     name,
+	}
+	s.AuditLog.CreateAuditLog(&logData)
+
+	return nil
 }

@@ -54,6 +54,7 @@ func (s *UserService) Register(email string, name string, password string) (*ent
 		Email:    email,
 		Name:     name,
 		Password: HashPass,
+		Role:     "sales",
 	}
 	result, err := s.user.CreateUser(&user)
 	if err != nil {
@@ -207,4 +208,8 @@ func (s *UserService) GoogleCallback(code string) (string, error) {
 
 	return jwtMake, nil
 
+}
+
+func (s *UserService) GetProfile(userID string) (*entity.User, error) {
+	return s.user.FindByID(userID)
 }

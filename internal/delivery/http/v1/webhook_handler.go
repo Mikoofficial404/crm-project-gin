@@ -119,7 +119,7 @@ func (h *WebhookHandler) ReceiveWhatsApp(c *gin.Context) {
 		if errAct != nil {
 			fmt.Println("Gagal mencatat Aktivitas:", errAct)
 		} else {
-			notifTitle := fmt.Sprintf("WA Baru: %s", existingLead.Name)
+			notifTitle := fmt.Sprintf("Pesan Wa: %s", existingLead.Name)
 			errNotif := h.notifSvc.CreateNotification(assigneeID, notifTitle, payload.Payload.Body)
 			if errNotif != nil {
 				fmt.Println("Gagal membuat Notifikasi:", errNotif)

@@ -145,3 +145,13 @@ func (r *LeadRepository) SearchLeads(keyword string) ([]entity.Lead, error) {
 	}
 	return leads, nil
 }
+
+func (r *LeadRepository) UpdateLead(leadID string, name string, email string, phone string) error {
+	ctx := context.Background()
+	err := r.dbGorm.WithContext(ctx).Model(&entity.Lead{}).Where("id = ?", leadID).Updates(map[string]interface{}{
+		"name":  name,
+		"email": email,
+		"phone": phone,
+	}).Error
+	return err
+}

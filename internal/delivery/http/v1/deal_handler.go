@@ -20,6 +20,11 @@ type CreateDealRequest struct {
 	LeadID string  `json:"leadId" binding:"required"`
 }
 
+type UpdateDealRequest struct {
+	Name  string  `json:"name" binding:"required"`
+	Value float64 `json:"value" binding:"required"`
+}
+
 type ReorderRequest struct {
 	DealIDs []string `json:"deal_ids" binding:"required"`
 }
@@ -189,4 +194,28 @@ func (h *DealHandler) ExportExcel(c *gin.Context) {
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 	c.Header("Content-Disposition", "attachment; filename=laporan_deals.xlsx")
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileBuffer.Bytes())
+}
+
+func (h *DealHandler) UpdateDeal(c *gin.Context) {
+	dealID := c.Param("id")
+	if dealID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID deal tidak boleh kosong"})
+		return
+	}
+
+	var req UpdateDealRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userId := c.MustGet("user_id").(string)
+	role := c.MustGet("role").(string)
+
+	err := h.dealService.UpdateDeal(dealID, req.Name, req.Value, userId, role)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "Update Deal berhasil", "data": gin.H{"id": dealID, "name": req.Name, "value": req.Value}})
 }

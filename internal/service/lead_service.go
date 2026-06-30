@@ -66,10 +66,11 @@ func (s *LeadService) CheckStaleLeads() {
 				websocket.SendMessageToUser(admin.Email, message)
 			}
 			websocket.SendMessageToUser(data.AssignedTo, pesan)
-		}
-		err = s.lead.UpdateStatus(data.ID, "ESCALATED")
-		if err != nil {
-			continue
+
+			err = s.lead.UpdateStatus(data.ID, "ESCALATED")
+			if err != nil {
+				continue
+			}
 		}
 	}
 }
@@ -80,6 +81,10 @@ func (s *LeadService) GetLeads(userID string, role string, page int, limit int, 
 	} else {
 		return s.lead.GetLeadsByUserId(userID, page, limit, search, status)
 	}
+}
+
+func (s *LeadService) GetLeadByID(leadID string) (*entity.Lead, error) {
+	return s.lead.GetLeadByID(leadID)
 }
 
 func (s *LeadService) UpdateLeadStatus(leadID string, status string, userID string, role string) error {
@@ -115,6 +120,25 @@ func (s *LeadService) DeleteLead(leadID string, userID string, role string) erro
 	}
 
 	return s.lead.SoftDeleteLead(leadID)
+}
+
+func (s *LeadService) UpdateLead(leadID string, name string, email string, phone string, userID string, role string) error {
+	if leadID == "" {
+		return errors.New("ID lead wajib diisi")
+	}
+
+	lead, err := s.lead.GetLeadByID(leadID)
+	if err != nil {
+		return fmt.Errorf("lead tidak ditemukan: %w", err)
+	}
+
+	if role == "sales" {
+		if lead.AssignedTo != userID {
+			return errors.New("unauthorized: ini bukan lead Anda")
+		}
+	}
+
+	return s.lead.UpdateLead(leadID, name, email, phone)
 }
 
 func (s *LeadService) ImportBulkLeads(leads []entity.Lead) error {

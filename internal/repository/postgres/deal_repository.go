@@ -116,3 +116,12 @@ func (r *DealRepository) UpdateDealPositions(dealIDs []string) error {
 	}
 	return tx.Commit().Error
 }
+
+func (r *DealRepository) UpdateDeal(dealID string, name string, value float64) error {
+	ctx := context.Background()
+	err := r.dbGorm.WithContext(ctx).Model(&entity.Deal{}).Where("id = ?", dealID).Updates(map[string]interface{}{
+		"name":  name,
+		"value": value,
+	}).Error
+	return err
+}

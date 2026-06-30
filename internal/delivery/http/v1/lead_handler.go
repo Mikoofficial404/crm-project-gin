@@ -43,6 +43,12 @@ type CreateLeadRequest struct {
 	CustomFields map[string]interface{} `json:"custom_fields" binding:"required"`
 }
 
+type UpdateLeadRequest struct {
+	Name  string `json:"name" binding:"required"`
+	Email string `json:"email" binding:"required,email"`
+	Phone string `json:"phone" binding:"required"`
+}
+
 func (h *LeadHandler) CreateLeader(c *gin.Context) {
 	var req CreateLeadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -126,6 +132,25 @@ func (h *LeadHandler) GetLeads(c *gin.Context) {
 	})
 }
 
+func (h *LeadHandler) GetLeadByID(c *gin.Context) {
+	leadID := c.Param("id")
+	if leadID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID lead tidak boleh kosong"})
+		return
+	}
+
+	data, err := h.leadService.GetLeadByID(leadID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Lead tidak ditemukan"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "Get Lead",
+		"data":   data,
+	})
+}
+
 func (h *LeadHandler) UpdateStatusLeads(c *gin.Context) {
 	catchId := c.Param("id")
 	var request struct {
@@ -199,7 +224,7 @@ func (h *LeadHandler) ReplyWhatsApp(c *gin.Context) {
 			log.Println("failed to send message:", err)
 		}
 	}()
-	activites, err := h.activtyService.CreateActivity("WhatsApp", req.Message, lead.ID, idSalesStr)
+	activites, err := h.activtyService.CreateActivity("WhatsApp Reply", req.Message, lead.ID, idSalesStr)
 	c.JSON(http.StatusOK, gin.H{"status: ": "Pesan Wa terima", "Aktifitas": activites})
 }
 
@@ -242,4 +267,29 @@ func (h *LeadHandler) ImportCSV(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"status": "Sukses Import Ratusan Lead!"})
+}
+
+func (h *LeadHandler) UpdateLead(c *gin.Context) {
+	leadID := c.Param("id")
+	if leadID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID lead tidak boleh kosong"})
+		return
+	}
+
+	var req UpdateLeadRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userID := c.MustGet("user_id").(string)
+	role := c.MustGet("role").(string)
+
+	err := h.leadService.UpdateLead(leadID, req.Name, req.Email, req.Phone, userID, role)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "Update Lead berhasil", "data": gin.H{"id": leadID, "name": req.Name, "email": req.Email, "phone": req.Phone}})
 }

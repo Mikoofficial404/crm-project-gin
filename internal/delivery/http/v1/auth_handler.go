@@ -155,3 +155,18 @@ func (h *UserHandler) CallbackGoogle(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "Token", "token": token})
 
 }
+
+func (h *UserHandler) GetMe(c *gin.Context) {
+	userID := c.MustGet("user_id").(string)
+	user, err := h.userService.GetProfile(userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User tidak ditemukan"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"id":    user.ID,
+		"name":  user.Name,
+		"email": user.Email,
+		"role":  user.Role,
+	})
+}

@@ -104,20 +104,24 @@ func main() {
 	protected.Use(middleware.AuthMiddleware(rdb))
 
 	protected.POST("/logout", authHandler.Logout)
+	protected.GET("/me", authHandler.GetMe)
 	protected.PATCH("/profile/password", authHandler.ChangePassword)
 	protected.GET("/profile/2fa/setup", authHandler.Setup2FA)
 
 	protected.POST("/leads", leadHandle.CreateLeader)
 	protected.POST("/leads/import", leadHandle.ImportCSV)
 	protected.GET("/leads", leadHandle.GetLeads)
+	protected.GET("/leads/:id", leadHandle.GetLeadByID)
 	protected.PATCH("/leads/:id/status", leadHandle.UpdateStatusLeads)
+	protected.PUT("/leads/:id", leadHandle.UpdateLead)
 	protected.DELETE("/leads/:id", leadHandle.DeleteLead)
 	protected.GET("/leads/trash", leadHandle.GetTrashedLeads)
 	protected.POST("/leads/trash/:id/restore", leadHandle.RestoreLead)
 
-	protected.POST("/dtadeals", dealHandler.CreateDeal)
+	protected.POST("/deals", dealHandler.CreateDeal)
 	protected.GET("/deals", dealHandler.GetDeals)
 	protected.PATCH("/deals/:id/stage", dealHandler.UpdateStage)
+	protected.PUT("/deals/:id", dealHandler.UpdateDeal)
 	protected.DELETE("/deals/:id", dealHandler.DeleteDeal)
 	protected.GET("/deals/export/pdf", dealHandler.ExportPDF)
 	protected.GET("/deals/export/excel", dealHandler.ExportExcel)
@@ -125,6 +129,8 @@ func main() {
 
 	protected.POST("/activities", activityHandler.CreateActivity)
 	protected.GET("/activities/:lead_id", activityHandler.GetActivities)
+	protected.PUT("/activities/:id", activityHandler.UpdateActivity)
+	protected.DELETE("/activities/:id", activityHandler.DeleteActivity)
 	protected.POST("/upload", activityHandler.UploadFile)
 
 	protected.GET("/search", searchHandler.GlobalSearch)
@@ -141,7 +147,7 @@ func main() {
 	protected.GET("/notifications", notifHandler.GetMyNotifications)
 	protected.PATCH("/notifications/:id/read", notifHandler.MarkAsRead)
 
-	protected.POST("/api/v1/leads/:id/reply", leadHandle.ReplyWhatsApp)
+	protected.POST("/leads/:id/reply", leadHandle.ReplyWhatsApp)
 
 	// adminGroup := protected.Group("/admin")
 	// adminGroup.Use(middleware.RoleMiddleware("admin"))

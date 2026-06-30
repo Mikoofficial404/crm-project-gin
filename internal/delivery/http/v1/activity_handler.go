@@ -24,6 +24,10 @@ type CreateActivity struct {
 	LeadID string `json:"leadID" binding:"required"`
 }
 
+type UpdateActivityRequest struct {
+	Notes string `json:"notes" binding:"required"`
+}
+
 func NewAcitivyHandler(activityService *service.ActivityService) *ActivityHandler {
 	return &ActivityHandler{
 		activityService: activityService,
@@ -93,4 +97,48 @@ func (h *ActivityHandler) UploadFile(c *gin.Context) {
 		"url":     "/uploads/" + newFileName,
 	})
 
+}
+
+func (h *ActivityHandler) UpdateActivity(c *gin.Context) {
+	activityID := c.Param("id")
+	if activityID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID aktivitas tidak boleh kosong"})
+		return
+	}
+
+	var req UpdateActivityRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userID := c.MustGet("user_id").(string)
+	role := c.MustGet("role").(string)
+
+	err := h.activityService.UpdateActivity(activityID, req.Notes, userID, role)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "Update Aktivitas berhasil", "data": gin.H{"id": activityID, "notes": req.Notes}})
+}
+
+func (h *ActivityHandler) DeleteActivity(c *gin.Context) {
+	activityID := c.Param("id")
+	if activityID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID aktivitas tidak boleh kosong"})
+		return
+	}
+
+	userID := c.MustGet("user_id").(string)
+	role := c.MustGet("role").(string)
+
+	err := h.activityService.DeleteActivity(activityID, userID, role)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "Aktivitas berhasil dihapus", "data": gin.H{"id": activityID}})
 }

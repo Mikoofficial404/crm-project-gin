@@ -44,3 +44,41 @@ func (s *ActivityService) GetActivitiesByLeadID(leadID string, role string) ([]e
 
 	return load, nil
 }
+
+func (s *ActivityService) UpdateActivity(activityID string, notes string, userID string, role string) error {
+	if activityID == "" {
+		return errors.New("ID aktivitas wajib diisi")
+	}
+
+	activity, err := s.activity.GetActivityByID(activityID)
+	if err != nil {
+		return fmt.Errorf("aktivitas tidak ditemukan: %w", err)
+	}
+
+	if role == "sales" {
+		if activity.AssignedTo != userID {
+			return errors.New("unauthorized: ini bukan aktivitas Anda")
+		}
+	}
+
+	return s.activity.UpdateActivity(activityID, notes)
+}
+
+func (s *ActivityService) DeleteActivity(activityID string, userID string, role string) error {
+	if activityID == "" {
+		return errors.New("ID aktivitas wajib diisi")
+	}
+
+	activity, err := s.activity.GetActivityByID(activityID)
+	if err != nil {
+		return fmt.Errorf("aktivitas tidak ditemukan: %w", err)
+	}
+
+	if role == "sales" {
+		if activity.AssignedTo != userID {
+			return errors.New("unauthorized: ini bukan aktivitas Anda")
+		}
+	}
+
+	return s.activity.DeleteActivity(activityID)
+}
