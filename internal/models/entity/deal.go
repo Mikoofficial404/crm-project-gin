@@ -12,6 +12,7 @@ type Deal struct {
 	Value      float64 `json:"value" gorm:"column:value"`
 	Stage      string  `json:"stage" gorm:"size:20;not null;default:PROSPECTING"`
 	LeadID     string  `json:"leadId" gorm:"type:uuid;not null"`
+	Lead       Lead    `json:"lead" gorm:"foreignKey:LeadID"`
 	AssignedTo string  `json:"assignedTo" gorm:"type:uuid;not null"`
 	Position   int     `json:"position" gorm:"column:position"`
 	CreatedAt  time.Time

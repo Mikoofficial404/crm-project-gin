@@ -38,7 +38,7 @@ func (r *DealRepository) GetAllDeals(page int, limit int, search string, stage s
 	var deals []entity.Deal
 	var total int64
 
-	query := r.dbGorm.Model(&entity.Deal{})
+	query := r.dbGorm.Model(&entity.Deal{}).Preload("Lead")
 	if search != "" {
 		query = query.Where("name ILIKE ?", "%"+search+"%")
 	}
@@ -61,7 +61,7 @@ func (r *DealRepository) GetDealByUserId(userId string, page int, limit int, sea
 	var deals []entity.Deal
 	var total int64
 
-	query := r.dbGorm.WithContext(ctx).Model(&entity.Deal{}).Where("assigned_to = ?", userId)
+	query := r.dbGorm.WithContext(ctx).Model(&entity.Deal{}).Preload("Lead").Where("assigned_to = ?", userId)
 	if search != "" {
 		query = query.Where("name ILIKE ?", "%"+search+"%")
 	}

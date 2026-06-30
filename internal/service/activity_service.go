@@ -17,12 +17,13 @@ func NewActivityService(activityRepo *postgres.ActivityRepository) *ActivityServ
 	}
 }
 
-func (s *ActivityService) CreateActivity(types string, notes string, leadID string, AssignedTo string) (*entity.Activity, error) {
+func (s *ActivityService) CreateActivity(types string, notes string, leadID string, AssignedTo string, attachment string) (*entity.Activity, error) {
 	activity := entity.Activity{
 		Type:       types,
 		Notes:      notes,
 		LeadID:     leadID,
 		AssignedTo: AssignedTo,
+		Attachment: attachment,
 	}
 
 	result, err := s.activity.CreateActivity(&activity)

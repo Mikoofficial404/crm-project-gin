@@ -213,3 +213,7 @@ func (s *UserService) GoogleCallback(code string) (string, error) {
 func (s *UserService) GetProfile(userID string) (*entity.User, error) {
 	return s.user.FindByID(userID)
 }
+
+func (s *UserService) GetAllUsers() ([]entity.User, error) {
+	return s.user.GetAllUsers()
+}

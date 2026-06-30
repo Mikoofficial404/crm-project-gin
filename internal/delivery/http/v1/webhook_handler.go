@@ -89,17 +89,20 @@ func (h *WebhookHandler) ReceiveWhatsApp(c *gin.Context) {
 			newNo = 0
 		}
 		h.redisClien.Set(context.Background(), "sales_turn_index", newNo, 0)
-		_, errCreate := h.leadService.CreateLead(payload.Payload.FromName, "", phone, assigneedID, nil)
+		newLead, errCreate := h.leadService.CreateLead(payload.Payload.FromName, "", phone, assigneedID, nil)
 		if errCreate != nil {
-			fmt.Println("Gagal membuat Lead otomatis:", err)
+			fmt.Println("Gagal membuat Lead otomatis:", errCreate)
 		} else {
+			h.activitySvc.CreateActivity("WhatsApp", payload.Payload.Body, newLead.ID, assigneedID, "")
 			go func() {
 				aiReply, errAi := h.aiService.GenerateSalesReply(payload.Payload.FromName, payload.Payload.Body)
 				if errAi != nil {
 					fmt.Println("[AI Error]:", errAi)
 					h.waService.SendWA(phone, "Terima kasih telah menghubungi kami. Tim kami akan segera membalas pesan Anda.")
+					h.activitySvc.CreateActivity("Catatan", "Bot Reply: Terima kasih telah menghubungi kami...", newLead.ID, assigneedID, "")
 				} else {
 					h.waService.SendWA(phone, aiReply)
+					h.activitySvc.CreateActivity("Catatan", "AI Reply: "+aiReply, newLead.ID, assigneedID, "")
 				}
 			}()
 		}
@@ -115,7 +118,7 @@ func (h *WebhookHandler) ReceiveWhatsApp(c *gin.Context) {
 			}
 		}
 
-		_, errAct := h.activitySvc.CreateActivity("WhatsApp", payload.Payload.Body, existingLead.ID, assigneeID)
+		_, errAct := h.activitySvc.CreateActivity("WhatsApp", payload.Payload.Body, existingLead.ID, assigneeID, "")
 		if errAct != nil {
 			fmt.Println("Gagal mencatat Aktivitas:", errAct)
 		} else {

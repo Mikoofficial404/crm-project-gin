@@ -13,6 +13,7 @@ type DashboardRepository struct {
 type DashboardStats struct {
 	TotalLeads       int64   `json:"total_leads"`
 	TotalDeals       int64   `json:"total_deals"`
+	TotalWonDeals    int64   `json:"total_won_deals"`
 	TotalRevenueWon  float64 `json:"total_revenue_won"`
 	PotentialRevenue float64 `json:"potential_revenue"`
 }
@@ -31,6 +32,10 @@ func (r *DashboardRepository) GetStats() (*DashboardStats, error) {
 	}
 
 	if err := r.dbGorm.Model(&entity.Deal{}).Count(&stats.TotalDeals).Error; err != nil {
+		return nil, err
+	}
+
+	if err := r.dbGorm.Model(&entity.Deal{}).Where("stage = ?", "WON").Count(&stats.TotalWonDeals).Error; err != nil {
 		return nil, err
 	}
 

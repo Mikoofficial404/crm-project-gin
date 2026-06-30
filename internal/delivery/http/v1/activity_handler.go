@@ -19,9 +19,10 @@ type ActivityHandler struct {
 }
 
 type CreateActivity struct {
-	Type   string `json:"type" binding:"required"`
-	Notes  string `json:"notes" binding:"required"`
-	LeadID string `json:"leadID" binding:"required"`
+	Type       string `json:"type" binding:"required"`
+	Notes      string `json:"notes" binding:"required"`
+	LeadID     string `json:"leadID" binding:"required"`
+	Attachment string `json:"attachment"`
 }
 
 type UpdateActivityRequest struct {
@@ -41,7 +42,7 @@ func (h *ActivityHandler) CreateActivity(c *gin.Context) {
 		return
 	}
 	userID := c.MustGet("user_id").(string)
-	data, err := h.activityService.CreateActivity(req.Type, req.Notes, req.LeadID, userID)
+	data, err := h.activityService.CreateActivity(req.Type, req.Notes, req.LeadID, userID, req.Attachment)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

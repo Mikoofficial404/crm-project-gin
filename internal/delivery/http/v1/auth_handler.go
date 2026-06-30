@@ -164,9 +164,22 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"id":    user.ID,
-		"name":  user.Name,
-		"email": user.Email,
-		"role":  user.Role,
+		"id":                    user.ID,
+		"name":                  user.Name,
+		"email":                 user.Email,
+		"role":                  user.Role,
+		"is_two_factor_enabled": user.IsTwoFactorEnabled,
+	})
+}
+
+func (h *UserHandler) GetUsers(c *gin.Context) {
+	users, err := h.userService.GetAllUsers()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data users"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Berhasil mengambil data users",
+		"data":    users,
 	})
 }

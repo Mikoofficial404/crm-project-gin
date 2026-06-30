@@ -48,3 +48,7 @@ func (s *NotificationService) MarkAsRead(userID string, notifID string) error {
 	}
 	return s.notificationRepo.MarkAsRead(notifID)
 }
+
+func (s *NotificationService) MarkAllAsRead(userID string) error {
+	return s.notificationRepo.MarkAllAsRead(userID)
+}

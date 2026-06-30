@@ -22,3 +22,9 @@ func SendMessageToUser(userID string, message string) error {
 	cable.WriteMessage(websocket.TextMessage, []byte(message))
 	return nil
 }
+
+func BroadcastMessage(message string) {
+	for _, conn := range AppHub.Clients {
+		conn.WriteMessage(websocket.TextMessage, []byte(message))
+	}
+}

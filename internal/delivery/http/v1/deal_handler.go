@@ -173,7 +173,7 @@ func (h *DealHandler) ExportPDF(c *gin.Context) {
 }
 
 func (h *DealHandler) DownloadInvoice(c *gin.Context) {
-	dealID := c.Param("deal_id")
+	dealID := c.Param("id")
 	dataByte, err := h.dealService.GenerateInvoicePDF(dealID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal melukis PDF: " + err.Error()})

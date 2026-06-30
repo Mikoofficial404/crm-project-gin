@@ -57,3 +57,12 @@ func (r *NotificationRepository) MarkAsRead(notifID string) error {
 		Update("is_read", true).Error
 	return err
 }
+
+func (r *NotificationRepository) MarkAllAsRead(userID string) error {
+	ctx := context.Background()
+	err := r.dbGorm.WithContext(ctx).
+		Model(&entity.Notification{}).
+		Where("user_id = ?", userID).
+		Update("is_read", true).Error
+	return err
+}

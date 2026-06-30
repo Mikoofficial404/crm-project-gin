@@ -7,11 +7,11 @@ import (
 )
 
 type Notification struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null;index"`
-	User      User      `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
-	Title     string    `gorm:"type:varchar(255);not null"`
-	Message   string    `gorm:"type:text;not null"`
-	IsRead    bool      `gorm:"default:false;not null"`
-	CreatedAt time.Time `gorm:"autoCreateTime"`
+	ID        uuid.UUID `json:"id" gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	UserID    uuid.UUID `json:"user_id" gorm:"type:uuid;not null;index"`
+	User      User      `json:"user" gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE"`
+	Title     string    `json:"title" gorm:"type:varchar(255);not null"`
+	Message   string    `json:"message" gorm:"type:text;not null"`
+	IsRead    bool      `json:"is_read" gorm:"default:false;not null"`
+	CreatedAt time.Time `json:"CreatedAt" gorm:"autoCreateTime"`
 }

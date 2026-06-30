@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"crm-project/internal/delivery/websocket"
 	"crm-project/internal/models/entity"
 	"crm-project/internal/repository/postgres"
@@ -10,19 +11,22 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
+	"github.com/redis/go-redis/v9"
 )
 
 type LeadService struct {
 	lead        *postgres.LeadRepository
 	user        *postgres.UserRepository
 	AsynqClient *asynq.Client
+	redisClient *redis.Client
 }
 
-func NewLeadService(leadRepo *postgres.LeadRepository, userRepo *postgres.UserRepository, asyncClient *asynq.Client) *LeadService {
+func NewLeadService(leadRepo *postgres.LeadRepository, userRepo *postgres.UserRepository, asyncClient *asynq.Client, redisClient *redis.Client) *LeadService {
 	return &LeadService{
 		lead:        leadRepo,
 		user:        userRepo,
 		AsynqClient: asyncClient,
+		redisClient: redisClient,
 	}
 }
 
@@ -40,6 +44,9 @@ func (s *LeadService) CreateLead(name string, email string, phone string, userID
 	if err != nil {
 		return nil, err
 	}
+
+	s.redisClient.Del(context.Background(), "crm_dashboard_stats")
+
 	return isResult, err
 }
 
@@ -62,7 +69,7 @@ func (s *LeadService) CheckStaleLeads() {
 			}
 			admins, err := s.user.GetAdmins()
 			for _, admin := range admins {
-				message := fmt.Sprintf("Peringatan Klien VIP Bernama %s telah ditelantarkan oleh Sale %s selama 3 hari!", admin.Name, findUser.Name)
+				message := fmt.Sprintf("Peringatan Klien  Bernama %s telah ditelantarkan oleh Sale %s selama 3 hari!", admin.Name, findUser.Name)
 				websocket.SendMessageToUser(admin.Email, message)
 			}
 			websocket.SendMessageToUser(data.AssignedTo, pesan)
@@ -119,7 +126,11 @@ func (s *LeadService) DeleteLead(leadID string, userID string, role string) erro
 		}
 	}
 
-	return s.lead.SoftDeleteLead(leadID)
+	err = s.lead.SoftDeleteLead(leadID)
+	if err == nil {
+		s.redisClient.Del(context.Background(), "crm_dashboard_stats")
+	}
+	return err
 }
 
 func (s *LeadService) UpdateLead(leadID string, name string, email string, phone string, userID string, role string) error {
@@ -138,11 +149,18 @@ func (s *LeadService) UpdateLead(leadID string, name string, email string, phone
 		}
 	}
 
-	return s.lead.UpdateLead(leadID, name, email, phone)
+	err = s.lead.UpdateLead(leadID, name, email, phone)
+	if err == nil {
+		s.redisClient.Del(context.Background(), "crm_dashboard_stats")
+	}
+	return err
 }
 
 func (s *LeadService) ImportBulkLeads(leads []entity.Lead) error {
 	_, err := s.lead.CreateBulkLeads(&leads)
+	if err == nil {
+		s.redisClient.Del(context.Background(), "crm_dashboard_stats")
+	}
 	return err
 }
 
@@ -159,5 +177,6 @@ func (s *LeadService) RestoreLead(leadID string) error {
 	if err != nil {
 		return err
 	}
+	s.redisClient.Del(context.Background(), "crm_dashboard_stats")
 	return nil
 }

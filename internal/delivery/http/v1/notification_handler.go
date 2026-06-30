@@ -47,3 +47,18 @@ func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
 		"message": "Notifikasi berhasil ditandai sudah dibaca",
 	})
 }
+
+func (h *NotificationHandler) MarkAllAsRead(c *gin.Context) {
+	userID := c.MustGet("user_id").(string)
+
+	err := h.notificationService.MarkAllAsRead(userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Semua notifikasi berhasil dibersihkan",
+	})
+}

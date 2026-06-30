@@ -62,13 +62,13 @@ func main() {
 	authHandler := v1.NewUserHandler(authService, rdb)
 
 	leadRepo := postgres.NewLeadRepository(database.GetDB())
-	leadService := service.NewLeadService(leadRepo, userRepo, clientAsynq)
+	leadService := service.NewLeadService(leadRepo, userRepo, clientAsynq, rdb)
 
 	dealRepo := postgres.NewDealRepository(database.GetDB())
 
 	invoiceRepo := postgres.NewInvoiceRepository(database.GetDB())
 	auditRepo := postgres.NewAuditRepository(database.GetDB())
-	dealService := service.NewDealService(dealRepo, auditRepo, clientAsynq, invoiceRepo)
+	dealService := service.NewDealService(dealRepo, auditRepo, clientAsynq, invoiceRepo, rdb)
 	dealHandler := v1.NewDealHandler(dealService)
 
 	activityRepo := postgres.NewActivityRepository(database.GetDB())
@@ -114,15 +114,15 @@ func main() {
 	protected.GET("/leads/:id", leadHandle.GetLeadByID)
 	protected.PATCH("/leads/:id/status", leadHandle.UpdateStatusLeads)
 	protected.PUT("/leads/:id", leadHandle.UpdateLead)
-	protected.DELETE("/leads/:id", leadHandle.DeleteLead)
-	protected.GET("/leads/trash", leadHandle.GetTrashedLeads)
-	protected.POST("/leads/trash/:id/restore", leadHandle.RestoreLead)
+	protected.DELETE("/leads/:id", middleware.RoleMiddleware("admin"), leadHandle.DeleteLead)
+	protected.GET("/leads/trash", middleware.RoleMiddleware("admin"), leadHandle.GetTrashedLeads)
+	protected.POST("/leads/trash/:id/restore", middleware.RoleMiddleware("admin"), leadHandle.RestoreLead)
 
 	protected.POST("/deals", dealHandler.CreateDeal)
 	protected.GET("/deals", dealHandler.GetDeals)
 	protected.PATCH("/deals/:id/stage", dealHandler.UpdateStage)
 	protected.PUT("/deals/:id", dealHandler.UpdateDeal)
-	protected.DELETE("/deals/:id", dealHandler.DeleteDeal)
+	protected.DELETE("/deals/:id", middleware.RoleMiddleware("admin"), dealHandler.DeleteDeal)
 	protected.GET("/deals/export/pdf", dealHandler.ExportPDF)
 	protected.GET("/deals/export/excel", dealHandler.ExportExcel)
 	protected.GET("/deals/:id/invoice", dealHandler.DownloadInvoice)
@@ -130,7 +130,7 @@ func main() {
 	protected.POST("/activities", activityHandler.CreateActivity)
 	protected.GET("/activities/:lead_id", activityHandler.GetActivities)
 	protected.PUT("/activities/:id", activityHandler.UpdateActivity)
-	protected.DELETE("/activities/:id", activityHandler.DeleteActivity)
+	protected.DELETE("/activities/:id", middleware.RoleMiddleware("admin"), activityHandler.DeleteActivity)
 	protected.POST("/upload", activityHandler.UploadFile)
 
 	protected.GET("/search", searchHandler.GlobalSearch)
@@ -145,14 +145,14 @@ func main() {
 	protected.GET("/analytics/forecasting", dashboardHandler.GetAnalytics)
 
 	protected.GET("/notifications", notifHandler.GetMyNotifications)
+	protected.PATCH("/notifications/read-all", notifHandler.MarkAllAsRead)
 	protected.PATCH("/notifications/:id/read", notifHandler.MarkAsRead)
 
 	protected.POST("/leads/:id/reply", leadHandle.ReplyWhatsApp)
 
-	// adminGroup := protected.Group("/admin")
-	// adminGroup.Use(middleware.RoleMiddleware("admin"))
-	// adminGroup.GET("/users", func(c *gin.Context) { ... })
-	//
+	adminGroup := protected.Group("/admin")
+	adminGroup.Use(middleware.RoleMiddleware("admin"))
+	adminGroup.GET("/users", authHandler.GetUsers)
 
 	c := cron.New()
 
@@ -160,5 +160,6 @@ func main() {
 		leadService.CheckStaleLeads()
 	})
 	c.Start()
+
 	r.Run(":8080")
 }

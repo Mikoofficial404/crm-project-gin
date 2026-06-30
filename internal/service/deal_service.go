@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"crm-project/internal/delivery/websocket"
 	"crm-project/internal/models/entity"
 	"crm-project/internal/repository/postgres"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/jung-kurt/gofpdf"
+	"github.com/redis/go-redis/v9"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -19,14 +21,16 @@ type DealService struct {
 	AuditLog    *postgres.AuditRepository
 	AsynqClient *asynq.Client
 	invoiceRepo *postgres.InvoiceRepository
+	redisClient *redis.Client
 }
 
-func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.AuditRepository, asyncClient *asynq.Client, invoiceRepo *postgres.InvoiceRepository) *DealService {
+func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.AuditRepository, asyncClient *asynq.Client, invoiceRepo *postgres.InvoiceRepository, redisClient *redis.Client) *DealService {
 	return &DealService{
 		deal:        dealRepo,
 		AuditLog:    auditRepo,
 		AsynqClient: asyncClient,
 		invoiceRepo: invoiceRepo,
+		redisClient: redisClient,
 	}
 }
 
@@ -43,6 +47,9 @@ func (s *DealService) CreateDeal(name string, value float64, leadID string, user
 	if err != nil {
 		return nil, err
 	}
+
+	s.redisClient.Del(context.Background(), "crm_dashboard_stats")
+
 	return result, nil
 }
 
@@ -86,17 +93,20 @@ func (s *DealService) UpdateStage(dealID string, status string, userID string, r
 		var InvoiceNo string
 		InvoiceNo = "INV"
 		wrapTeks := fmt.Sprintf("%s-%s", InvoiceNo, dealID)
-		invoice := entity.Invoice{
-			InvoiceNo:  wrapTeks,
-			DealID:     dealID,
-			SubTotal:   subTotal,
-			GrandTotal: total,
-			Tax:        pajakPpn,
-			Status:     "UNPAID",
-		}
-		_, err := s.invoiceRepo.CreateInvoice(&invoice)
-		if err != nil {
-			return err
+		existingInvoice, _ := s.invoiceRepo.GetInvoiceByDealID(dealID)
+		if existingInvoice == nil {
+			invoice := entity.Invoice{
+				InvoiceNo:  wrapTeks,
+				DealID:     dealID,
+				SubTotal:   subTotal,
+				GrandTotal: total,
+				Tax:        pajakPpn,
+				Status:     "UNPAID",
+			}
+			_, err := s.invoiceRepo.CreateInvoice(&invoice)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	dealById, err := s.deal.GetDealByID(dealID)
@@ -121,6 +131,9 @@ func (s *DealService) UpdateStage(dealID string, status string, userID string, r
 	}
 
 	s.AuditLog.CreateAuditLog(&logData)
+
+	s.redisClient.Del(context.Background(), "crm_dashboard_stats")
+
 	return nil
 }
 
@@ -140,7 +153,11 @@ func (s *DealService) DeleteDeal(dealID string, userID string, role string) erro
 		}
 	}
 
-	return s.deal.SoftDeleteDeal(dealID)
+	err = s.deal.SoftDeleteDeal(dealID)
+	if err == nil {
+		s.redisClient.Del(context.Background(), "crm_dashboard_stats")
+	}
+	return err
 }
 
 func (s *DealService) ExportDealsToExcel() (*bytes.Buffer, error) {
@@ -298,6 +315,7 @@ func (s *DealService) UpdateDeal(dealID string, name string, value float64, user
 		NewData:     name,
 	}
 	s.AuditLog.CreateAuditLog(&logData)
+	s.redisClient.Del(context.Background(), "crm_dashboard_stats")
 
 	return nil
 }

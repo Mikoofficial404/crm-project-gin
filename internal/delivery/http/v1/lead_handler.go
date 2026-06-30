@@ -224,7 +224,7 @@ func (h *LeadHandler) ReplyWhatsApp(c *gin.Context) {
 			log.Println("failed to send message:", err)
 		}
 	}()
-	activites, err := h.activtyService.CreateActivity("WhatsApp Reply", req.Message, lead.ID, idSalesStr)
+	activites, err := h.activtyService.CreateActivity("WhatsApp Reply", req.Message, lead.ID, idSalesStr, "")
 	c.JSON(http.StatusOK, gin.H{"status: ": "Pesan Wa terima", "Aktifitas": activites})
 }
 
