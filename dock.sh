@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Script manager untuk Docker CRM Project
-# Penggunaan: ./dock.sh [crm-start|crm-stop|crm-restart|crm-logs|crm-status]
-
 COMMAND=$1
 
 case "$COMMAND" in

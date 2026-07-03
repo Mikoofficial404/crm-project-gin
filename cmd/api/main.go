@@ -49,6 +49,10 @@ func main() {
 		asynq.RedisClientOpt{Addr: "localhost:6380"},
 		asynq.Config{Concurrency: 10},
 	)
+
+	campaignRepo := postgres.NewCampaignRepository(database.GetDB())
+	campaignRecipientRepo := postgres.NewCampaignRecipientRepository(database.GetDB())
+
 	mux := asynq.NewServeMux()
 	mux.HandleFunc("email:send", worker.HandleSendEmailTask)
 	go func() {
@@ -58,18 +62,25 @@ func main() {
 	}()
 
 	userRepo := postgres.NewUserRepository(database.GetDB())
-	authService := service.NewUserService(userRepo)
+	authService := service.NewUserService(userRepo, rdb, clientAsynq)
 	authHandler := v1.NewUserHandler(authService, rdb)
 
-	leadRepo := postgres.NewLeadRepository(database.GetDB())
-	leadService := service.NewLeadService(leadRepo, userRepo, clientAsynq, rdb)
-
 	dealRepo := postgres.NewDealRepository(database.GetDB())
+	pipelineStageRepo := postgres.NewPipelineStageRepository(database.GetDB())
+	dealProductRepo := postgres.NewDealProductRepository(database.GetDB())
 
 	invoiceRepo := postgres.NewInvoiceRepository(database.GetDB())
 	auditRepo := postgres.NewAuditRepository(database.GetDB())
-	dealService := service.NewDealService(dealRepo, auditRepo, clientAsynq, invoiceRepo, rdb)
+	dealService := service.NewDealService(dealRepo, auditRepo, clientAsynq, invoiceRepo, rdb, pipelineStageRepo, dealProductRepo)
 	dealHandler := v1.NewDealHandler(dealService)
+
+	leadRepo := postgres.NewLeadRepository(database.GetDB())
+
+	contactRepo := postgres.NewContactRepository(database.GetDB())
+	contactService := service.NewContactService(contactRepo)
+	contactHandler := v1.NewContactHandler(contactService)
+
+	leadService := service.NewLeadService(leadRepo, userRepo, clientAsynq, rdb, auditRepo, contactRepo)
 
 	activityRepo := postgres.NewActivityRepository(database.GetDB())
 	activityService := service.NewActivityService(activityRepo)
@@ -79,9 +90,35 @@ func main() {
 	notifService := service.NewNotificationService(notifRepo)
 	notifHandler := v1.NewNotificationHandler(notifService)
 
-	searchService := service.NewSearchService(leadRepo, dealRepo, userRepo)
+	searchService := service.NewSearchService(leadRepo, dealRepo, userRepo, contactRepo)
 	searchHandler := v1.NewServiceHandler(searchService)
 
+	taskRepo := postgres.NewTaskRepository(database.GetDB())
+	taskService := service.NewTaskService(taskRepo, userRepo, notifService)
+	taskHandler := v1.NewTaskHandler(taskService)
+
+	pipelineRepo := postgres.NewPipelineRepository(database.GetDB())
+	pipelineService := service.NewPipelineService(pipelineRepo, pipelineStageRepo)
+	pipelineHandler := v1.NewPipelineHandler(pipelineService)
+
+	productRepo := postgres.NewProductRepository(database.GetDB())
+	productService := service.NewProductService(productRepo)
+	productHandler := v1.NewProductHandler(productService)
+
+	reportRepo := postgres.NewReportRepository(database.GetDB())
+	reportService := service.NewReportService(reportRepo, rdb)
+	reportHandler := v1.NewReportHandler(reportService)
+
+	campaignService := service.NewCampaignService(campaignRepo, campaignRecipientRepo, leadRepo, contactRepo, clientAsynq)
+	campaignHandler := v1.NewCampaignHandler(campaignService)
+
+	mux.HandleFunc("email:campaign", worker.NewHandleCampaignEmailTask(
+		campaignRecipientRepo.UpdateRecipientStatus,
+		campaignService.MarkCampaignSentIfDone,
+	))
+
+	r.POST("/api/v1/auth/forgot-password", authHandler.ForgotPassword)
+	r.POST("/api/v1/auth/reset-password", authHandler.ResetPassword)
 	r.POST("/api/v1/register", authHandler.Register)
 	r.POST("/api/v1/login", middleware.RateLimitMiddleware(rdb), authHandler.Login)
 	r.POST("/api/v1/login/verify-otp", authHandler.VerifyOTP)
@@ -98,7 +135,7 @@ func main() {
 
 	leadHandle := v1.NewLeadHandler(leadService, leadRepo, waService, activityService)
 
-	webhookHandler := v1.NewWebhookHandler(leadService, waService, userRepo, leadRepo, activityService, notifService, rdb, aiService)
+	webhookHandler := v1.NewWebhookHandler(leadService, waService, userRepo, leadRepo, activityService, notifService, rdb, aiService, contactService)
 	r.POST("/api/v1/webhook/whatsapp", webhookHandler.ReceiveWhatsApp)
 	protected := r.Group("/api/v1")
 	protected.Use(middleware.AuthMiddleware(rdb))
@@ -126,6 +163,11 @@ func main() {
 	protected.GET("/deals/export/pdf", dealHandler.ExportPDF)
 	protected.GET("/deals/export/excel", dealHandler.ExportExcel)
 	protected.GET("/deals/:id/invoice", dealHandler.DownloadInvoice)
+	protected.POST("/deals/:id/products", dealHandler.AssignProduct)
+	protected.DELETE("/deals/:id/products/:productId", dealHandler.RemoveProduct)
+	protected.GET("/deals/:id/products", dealHandler.GetDealProducts)
+
+	protected.PATCH("/invoices/:id/status", dealHandler.UpdateInvoiceStatus)
 
 	protected.POST("/activities", activityHandler.CreateActivity)
 	protected.GET("/activities/:lead_id", activityHandler.GetActivities)
@@ -150,14 +192,72 @@ func main() {
 
 	protected.POST("/leads/:id/reply", leadHandle.ReplyWhatsApp)
 
+	protected.POST("/tasks", taskHandler.CreateTask)
+	protected.GET("/tasks", taskHandler.GetAllTasks)
+	protected.GET("/tasks/:id", taskHandler.GetTaskByID)
+	protected.PUT("/tasks/:id", taskHandler.UpdateTask)
+	protected.DELETE("/tasks/:id", taskHandler.DeleteTask)
+	protected.PATCH("/tasks/:id/done", taskHandler.MarkAsDone)
+
+	protected.POST("/contacts", contactHandler.CreateContact)
+	protected.GET("/contacts", contactHandler.GetAllContacts)
+	protected.GET("/contacts/:id", contactHandler.GetContactByID)
+	protected.PATCH("/contacts/:id", contactHandler.UpdateContact)
+	protected.DELETE("/contacts/:id", contactHandler.DeleteContact)
+
+	adminPipeline := protected.Group("/pipelines")
+	adminPipeline.Use(middleware.RoleMiddleware("admin"))
+	adminPipeline.POST("", pipelineHandler.CreatePipeline)
+	adminPipeline.GET("", pipelineHandler.GetAllPipelines)
+	adminPipeline.GET("/:id", pipelineHandler.GetPipelineByID)
+	adminPipeline.PATCH("/:id", pipelineHandler.UpdatePipeline)
+	adminPipeline.DELETE("/:id", pipelineHandler.DeletePipeline)
+	adminPipeline.POST("/:id/stages", pipelineHandler.AddStage)
+	adminPipeline.PATCH("/:id/stages/:stageId", pipelineHandler.UpdateStage)
+	adminPipeline.DELETE("/:id/stages/:stageId", pipelineHandler.DeleteStage)
+	adminPipeline.PATCH("/:id/stages/reorder", pipelineHandler.ReorderStages)
+
+	protected.GET("/reports/sales-summary", middleware.RoleMiddleware("admin"), reportHandler.GetSalesSummary)
+	protected.GET("/reports/pipeline", middleware.RoleMiddleware("admin"), reportHandler.GetPipelineReport)
+	protected.GET("/reports/sales-performance", middleware.RoleMiddleware("admin"), reportHandler.GetSalesPerformance)
+	protected.GET("/reports/lead-source", middleware.RoleMiddleware("admin"), reportHandler.GetLeadSourceReport)
+	protected.GET("/reports/activity", middleware.RoleMiddleware("admin"), reportHandler.GetActivityReport)
+
+	adminProduct := protected.Group("/products")
+	adminProduct.Use(middleware.RoleMiddleware("admin"))
+	adminProduct.POST("", productHandler.CreateProduct)
+	adminProduct.GET("", productHandler.GetAllProducts)
+	adminProduct.GET("/:id", productHandler.GetProductByID)
+	adminProduct.PATCH("/:id", productHandler.UpdateProduct)
+	adminProduct.DELETE("/:id", productHandler.DeleteProduct)
+
 	adminGroup := protected.Group("/admin")
 	adminGroup.Use(middleware.RoleMiddleware("admin"))
 	adminGroup.GET("/users", authHandler.GetUsers)
+
+	adminCampaign := protected.Group("/campaigns")
+	adminCampaign.Use(middleware.RoleMiddleware("admin"))
+	adminCampaign.POST("", campaignHandler.CreateCampaign)
+	adminCampaign.GET("", campaignHandler.GetAllCampaigns)
+	adminCampaign.GET("/:id", campaignHandler.GetCampaignByID)
+	adminCampaign.PATCH("/:id", campaignHandler.UpdateCampaign)
+	adminCampaign.DELETE("/:id", campaignHandler.DeleteCampaign)
+	adminCampaign.POST("/:id/recipients", campaignHandler.AddRecipients)
+	adminCampaign.GET("/:id/recipients", campaignHandler.GetRecipients)
+	adminCampaign.POST("/:id/send", campaignHandler.SendCampaign)
+	adminCampaign.POST("/:id/schedule", campaignHandler.ScheduleCampaign)
+	adminCampaign.GET("/:id/stats", campaignHandler.GetCampaignStats)
 
 	c := cron.New()
 
 	c.AddFunc("* * * * *", func() {
 		leadService.CheckStaleLeads()
+	})
+	c.AddFunc("* * * * *", func() {
+		campaignService.ProcessScheduledCampaigns()
+	})
+	c.AddFunc("0 8 * * *", func() {
+		taskService.SendDueDateReminders()
 	})
 	c.Start()
 

@@ -80,15 +80,9 @@ func (h *LeadHandler) GetTrashedLeads(c *gin.Context) {
 }
 func (h *LeadHandler) RestoreLead(c *gin.Context) {
 	id := c.Param("id")
+	userID := c.MustGet("user_id").(string)
 
-	err := h.leadService.RestoreLead(id)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid ID",
-		})
-		return
-	}
-	err = h.leadService.RestoreLead(id)
+	err := h.leadService.RestoreLead(id, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),

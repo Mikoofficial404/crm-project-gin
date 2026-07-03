@@ -71,3 +71,25 @@ func NewEmailDeliveryTask(To string, Subject string, Body string) (*asynq.Task, 
 	}
 	return asynq.NewTask("email:send", payload), nil
 }
+
+type CampaignEmailPayload struct {
+	CampaignID  string `json:"campaign_id"`
+	RecipientID string `json:"recipient_id"`
+	To          string `json:"to"`
+	Subject     string `json:"subject"`
+	Body        string `json:"body"`
+}
+
+func NewCampaignEmailTask(campaignID, recipientID, to, subject, body string) (*asynq.Task, error) {
+	payload, err := json.Marshal(CampaignEmailPayload{
+		CampaignID:  campaignID,
+		RecipientID: recipientID,
+		To:          to,
+		Subject:     subject,
+		Body:        body,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return asynq.NewTask("email:campaign", payload), nil
+}

@@ -28,7 +28,24 @@ func DBConn() *gorm.DB {
 }
 
 func MigrateDB() error {
-	err := DB.AutoMigrate(&entity.User{}, &entity.Lead{}, &entity.Deal{}, &entity.Activity{}, &entity.Notification{}, &entity.AuditLog{}, &entity.Invoice{})
+	err := DB.AutoMigrate(
+		&entity.Pipeline{},
+		&entity.PipelineStage{},
+		&entity.User{},
+		&entity.Contact{},
+		&entity.Lead{},
+		&entity.Deal{},
+		&entity.Activity{},
+		&entity.Notification{},
+		&entity.AuditLog{},
+		&entity.Product{},
+		&entity.Invoice{},
+		&entity.InvoiceItem{},
+		&entity.DealProduct{},
+		&entity.Task{},
+		&entity.Campaign{},
+		&entity.CampaignRecipient{},
+	)
 	if err != nil {
 		return err
 	}

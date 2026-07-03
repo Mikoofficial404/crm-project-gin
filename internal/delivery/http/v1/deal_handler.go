@@ -15,9 +15,11 @@ type DealHandler struct {
 }
 
 type CreateDealRequest struct {
-	Name   string  `json:"name" binding:"required"`
-	Value  float64 `json:"value" binding:"required"`
-	LeadID string  `json:"leadId" binding:"required"`
+	Name       string  `json:"name" binding:"required"`
+	Value      float64 `json:"value" binding:"required"`
+	LeadID     string  `json:"leadId" binding:"required"`
+	PipelineID string  `json:"pipelineId" binding:"required"`
+	StageID    string  `json:"stageId" binding:"required"`
 }
 
 type UpdateDealRequest struct {
@@ -30,7 +32,11 @@ type ReorderRequest struct {
 }
 
 type UpdateStageRequest struct {
-	Stage string `json:"stage" binding:"required"`
+	StageID string `json:"stage_id" binding:"required"`
+}
+
+type UpdateInvoiceStatusRequest struct {
+	Status string `json:"status" binding:"required"`
 }
 
 func NewDealHandler(dealService *service.DealService) *DealHandler {
@@ -60,7 +66,7 @@ func (h *DealHandler) CreateDeal(c *gin.Context) {
 		return
 	}
 	userID := c.MustGet("user_id").(string)
-	data, err := h.dealService.CreateDeal(req.Name, req.Value, req.LeadID, userID)
+	data, err := h.dealService.CreateDeal(req.Name, req.Value, req.LeadID, userID, req.PipelineID, req.StageID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -75,7 +81,8 @@ func (h *DealHandler) GetDeals(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	search := c.Query("search")
-	stage := c.Query("stage")
+	stageID := c.Query("stage_id")
+	pipelineID := c.Query("pipeline_id")
 	if page < 1 {
 		page = 1
 	}
@@ -83,7 +90,7 @@ func (h *DealHandler) GetDeals(c *gin.Context) {
 		limit = 10
 	}
 
-	data, total, err := h.dealService.GetDeals(userId, role, page, limit, search, stage)
+	data, total, err := h.dealService.GetDeals(userId, role, page, limit, search, stageID, pipelineID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -115,12 +122,12 @@ func (h *DealHandler) UpdateStage(c *gin.Context) {
 	userId := c.MustGet("user_id").(string)
 	role := c.MustGet("role").(string)
 
-	err := h.dealService.UpdateStage(dealID, req.Stage, userId, role)
+	err := h.dealService.UpdateStage(dealID, req.StageID, userId, role)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusAccepted, gin.H{"status": "Update stage Deal berhasil", "data": gin.H{"id": dealID, "stage": req.Stage}})
+	c.JSON(http.StatusAccepted, gin.H{"status": "Update stage Deal berhasil", "data": gin.H{"id": dealID, "stage_id": req.StageID}})
 }
 
 func (h *DealHandler) DeleteDeal(c *gin.Context) {
@@ -146,7 +153,7 @@ func (h *DealHandler) ExportCSC(c *gin.Context) {
 	c.Header("Content-Disposition", "attachment;filename=laporan_deals.csv")
 	userID := c.MustGet("user_id").(string)
 	role := c.MustGet("role").(string)
-	data, _, err := h.dealService.GetDeals(userID, role, 1, 1000, "", "")
+	data, _, err := h.dealService.GetDeals(userID, role, 1, 1000, "", "", "")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -155,7 +162,7 @@ func (h *DealHandler) ExportCSC(c *gin.Context) {
 	writer.Write([]string{"ID Deal", "Nama Deal", "Nilai (Rp)", "Status Stage"})
 	for _, deal := range data {
 		nilaiString := fmt.Sprintf("%.2f", deal.Value)
-		barisData := []string{deal.ID, deal.Name, nilaiString, deal.Stage}
+		barisData := []string{deal.ID, deal.Name, nilaiString, deal.Stage.Name}
 		writer.Write(barisData)
 	}
 	writer.Flush()
@@ -218,4 +225,78 @@ func (h *DealHandler) UpdateDeal(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "Update Deal berhasil", "data": gin.H{"id": dealID, "name": req.Name, "value": req.Value}})
+}
+
+func (h *DealHandler) UpdateInvoiceStatus(c *gin.Context) {
+	invoiceID := c.Param("id")
+	if invoiceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ID invoice tidak boleh kosong"})
+		return
+	}
+
+	var req UpdateInvoiceStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.dealService.UpdateInvoiceStatus(invoiceID, req.Status)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "Status invoice berhasil diupdate", "data": gin.H{"id": invoiceID, "status": req.Status}})
+}
+
+type AssignProductRequest struct {
+	ProductID string  `json:"product_id" binding:"required"`
+	Quantity  int     `json:"quantity" binding:"required,min=1"`
+	UnitPrice float64 `json:"unit_price" binding:"required,min=0"`
+}
+
+func (h *DealHandler) AssignProduct(c *gin.Context) {
+	dealID := c.Param("id")
+	userID := c.GetString("userID")
+	role := c.GetString("role")
+
+	var req AssignProductRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	result, err := h.dealService.AssignProductToDeal(dealID, req.ProductID, req.Quantity, req.UnitPrice, userID, role)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": "Produk berhasil ditambahkan ke deal", "data": result})
+}
+
+func (h *DealHandler) RemoveProduct(c *gin.Context) {
+	dealID := c.Param("id")
+	productID := c.Param("productId")
+	userID := c.GetString("userID")
+	role := c.GetString("role")
+
+	err := h.dealService.RemoveProductFromDeal(dealID, productID, userID, role)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Produk berhasil dihapus dari deal"})
+}
+
+func (h *DealHandler) GetDealProducts(c *gin.Context) {
+	dealID := c.Param("id")
+
+	products, err := h.dealService.GetDealProducts(dealID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Berhasil mengambil produk deal", "data": products})
 }

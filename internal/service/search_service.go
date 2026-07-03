@@ -7,26 +7,33 @@ import (
 )
 
 type SearchService struct {
-	LeadRepository *postgres.LeadRepository
-	DealRepository *postgres.DealRepository
-	UserRepository *postgres.UserRepository
+	LeadRepository    *postgres.LeadRepository
+	DealRepository    *postgres.DealRepository
+	UserRepository    *postgres.UserRepository
+	ContactRepository *postgres.ContactRepository
 }
 
-func NewSearchService(leadRepo *postgres.LeadRepository, dealRepo *postgres.DealRepository, userRepo *postgres.UserRepository) *SearchService {
-	return &SearchService{LeadRepository: leadRepo, DealRepository: dealRepo, UserRepository: userRepo}
+func NewSearchService(leadRepo *postgres.LeadRepository, dealRepo *postgres.DealRepository, userRepo *postgres.UserRepository, contactRepo *postgres.ContactRepository) *SearchService {
+	return &SearchService{
+		LeadRepository:    leadRepo,
+		DealRepository:    dealRepo,
+		UserRepository:    userRepo,
+		ContactRepository: contactRepo,
+	}
 }
 
 func (r *SearchService) GlobalSearch(keyword string) (entity.GlobalSearchResponse, error) {
 	var (
-		wg    sync.WaitGroup
-		mu    sync.Mutex
-		leads []entity.Lead
-		deals []entity.Deal
-		users []entity.User
-		errs  []error
+		wg       sync.WaitGroup
+		mu       sync.Mutex
+		leads    []entity.Lead
+		deals    []entity.Deal
+		users    []entity.User
+		contacts []entity.Contact
+		errs     []error
 	)
 
-	wg.Add(3)
+	wg.Add(4)
 	go func() {
 		defer wg.Done()
 		result, err := r.LeadRepository.SearchLeads(keyword)
@@ -63,16 +70,27 @@ func (r *SearchService) GlobalSearch(keyword string) (entity.GlobalSearchRespons
 		users = result
 	}()
 
+	go func() {
+		defer wg.Done()
+		result, err := r.ContactRepository.SearchContacts(keyword)
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			errs = append(errs, err)
+			return
+		}
+		contacts = result
+	}()
+
 	wg.Wait()
 	if len(errs) > 0 {
-		return entity.
-			GlobalSearchResponse{}, errs[0]
+		return entity.GlobalSearchResponse{}, errs[0]
 	}
 
-	result := entity.GlobalSearchResponse{
-		Leads: leads,
-		Deals: deals,
-		Users: users,
-	}
-	return result, nil
+	return entity.GlobalSearchResponse{
+		Leads:    leads,
+		Deals:    deals,
+		Users:    users,
+		Contacts: contacts,
+	}, nil
 }

@@ -6,6 +6,7 @@ import (
 	"crm-project/internal/models/entity"
 	"crm-project/internal/repository/postgres"
 	"crm-project/internal/worker"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -17,37 +18,66 @@ import (
 type LeadService struct {
 	lead        *postgres.LeadRepository
 	user        *postgres.UserRepository
+	contact     *postgres.ContactRepository
+	AuditLog    *postgres.AuditRepository
 	AsynqClient *asynq.Client
 	redisClient *redis.Client
 }
 
-func NewLeadService(leadRepo *postgres.LeadRepository, userRepo *postgres.UserRepository, asyncClient *asynq.Client, redisClient *redis.Client) *LeadService {
+func NewLeadService(leadRepo *postgres.LeadRepository, userRepo *postgres.UserRepository, asyncClient *asynq.Client, redisClient *redis.Client, AuditLog *postgres.AuditRepository, contactRepo *postgres.ContactRepository) *LeadService {
 	return &LeadService{
 		lead:        leadRepo,
 		user:        userRepo,
+		contact:     contactRepo,
 		AsynqClient: asyncClient,
 		redisClient: redisClient,
+		AuditLog:    AuditLog,
 	}
 }
 
 func (s *LeadService) CreateLead(name string, email string, phone string, userID string, customFields map[string]interface{}) (*entity.Lead, error) {
+	var contactID *string
+	if phone != "" {
+		existing, err := s.contact.FindByPhone(phone)
+		if err == nil && existing != nil {
+			contactID = &existing.ID
+		}
+	}
+	return s.CreateLeadWithContact(name, email, phone, userID, customFields, contactID)
+}
+
+func (s *LeadService) CreateLeadWithContact(name string, email string, phone string, userID string, customFields map[string]interface{}, contactID *string) (*entity.Lead, error) {
 	lead := entity.Lead{
 		Name:         name,
 		Email:        email,
 		Phone:        phone,
 		Status:       "NEW",
 		AssignedTo:   userID,
+		ContactID:    contactID,
 		CustomFields: customFields,
 	}
 
-	isResult, err := s.lead.CreateLead(&lead)
+	newLead, err := s.lead.CreateLead(&lead)
 	if err != nil {
 		return nil, err
 	}
 
 	s.redisClient.Del(context.Background(), "crm_dashboard_stats")
 
-	return isResult, err
+	NewDataJson, err := json.Marshal(newLead)
+	if err != nil {
+		return nil, err
+	}
+
+	logData := entity.AuditLog{
+		UserIDAudit: userID,
+		Action:      "CREATE-LEAD",
+		TargetID:    newLead.ID,
+		OldData:     "-",
+		NewData:     string(NewDataJson),
+	}
+	s.AuditLog.CreateAuditLog(&logData)
+	return newLead, err
 }
 
 func (s *LeadService) CheckStaleLeads() {
@@ -107,7 +137,27 @@ func (s *LeadService) UpdateLeadStatus(leadID string, status string, userID stri
 			return errors.New("unauthorized: ini bukan prospek Anda")
 		}
 	}
-	return s.lead.UpdateStatus(leadID, status)
+
+	oldDataJSON, _ := json.Marshal(load)
+	err = s.lead.UpdateStatus(leadID, status)
+	if err != nil {
+		return err
+	}
+
+	newLead, err := s.lead.GetLeadByID(leadID)
+	if err != nil {
+		return nil
+	}
+	newDataJSON, _ := json.Marshal(newLead)
+	logData := entity.AuditLog{
+		UserIDAudit: userID,
+		Action:      "UPDATE_LEAD_STATUS",
+		TargetID:    leadID,
+		OldData:     string(oldDataJSON),
+		NewData:     string(newDataJSON),
+	}
+	s.AuditLog.CreateAuditLog(&logData)
+	return nil
 }
 
 func (s *LeadService) DeleteLead(leadID string, userID string, role string) error {
@@ -115,13 +165,13 @@ func (s *LeadService) DeleteLead(leadID string, userID string, role string) erro
 		return errors.New("ID lead wajib diisi")
 	}
 
-	lead, err := s.lead.GetLeadByID(leadID)
+	oldLead, err := s.lead.GetLeadByID(leadID)
 	if err != nil {
 		return fmt.Errorf("lead tidak ditemukan: %w", err)
 	}
 
 	if role == "sales" {
-		if lead.AssignedTo != userID {
+		if oldLead.AssignedTo != userID {
 			return errors.New("unauthorized: ini bukan lead Anda")
 		}
 	}
@@ -130,6 +180,19 @@ func (s *LeadService) DeleteLead(leadID string, userID string, role string) erro
 	if err == nil {
 		s.redisClient.Del(context.Background(), "crm_dashboard_stats")
 	}
+	oldDataJSON, err := json.Marshal(oldLead)
+	if err != nil {
+		return nil
+	}
+
+	logData := entity.AuditLog{
+		UserIDAudit: userID,
+		Action:      "DELETE-LEAD",
+		TargetID:    leadID,
+		OldData:     string(oldDataJSON),
+		NewData:     "-",
+	}
+	s.AuditLog.CreateAuditLog(&logData)
 	return err
 }
 
@@ -138,22 +201,46 @@ func (s *LeadService) UpdateLead(leadID string, name string, email string, phone
 		return errors.New("ID lead wajib diisi")
 	}
 
-	lead, err := s.lead.GetLeadByID(leadID)
+	oldLead, err := s.lead.GetLeadByID(leadID)
 	if err != nil {
 		return fmt.Errorf("lead tidak ditemukan: %w", err)
 	}
 
 	if role == "sales" {
-		if lead.AssignedTo != userID {
+		if oldLead.AssignedTo != userID {
 			return errors.New("unauthorized: ini bukan lead Anda")
 		}
 	}
 
 	err = s.lead.UpdateLead(leadID, name, email, phone)
-	if err == nil {
-		s.redisClient.Del(context.Background(), "crm_dashboard_stats")
+	if err != nil {
+		return err
 	}
-	return err
+
+	s.redisClient.Del(context.Background(), "crm_dashboard_stats")
+	newLead, err := s.lead.GetLeadByID(leadID)
+	if err != nil {
+		return nil
+	}
+	oldDataJSON, err := json.Marshal(oldLead)
+	if err != nil {
+		return nil
+	}
+	newDataJSON, err := json.Marshal(newLead)
+	if err != nil {
+		return nil
+	}
+	logData := entity.AuditLog{
+		UserIDAudit: userID,
+		Action:      "UPDATE_LEAD",
+		TargetID:    leadID,
+		OldData:     string(oldDataJSON),
+		NewData:     string(newDataJSON),
+	}
+
+	s.AuditLog.CreateAuditLog(&logData)
+
+	return nil
 }
 
 func (s *LeadService) ImportBulkLeads(leads []entity.Lead) error {
@@ -172,11 +259,32 @@ func (s *LeadService) GetTrashedLeads(userID string, role string) (*[]entity.Lea
 	return leads, nil
 }
 
-func (s *LeadService) RestoreLead(leadID string) error {
+func (s *LeadService) RestoreLead(leadID string, userID string) error {
+	if leadID == "" {
+		return errors.New("ID lead wajib diisi")
+	}
+
 	err := s.lead.RestoreLead(leadID)
 	if err != nil {
 		return err
 	}
 	s.redisClient.Del(context.Background(), "crm_dashboard_stats")
+	restoredLead, err := s.lead.GetLeadByID(leadID)
+	if err != nil {
+		return nil
+	}
+	newDataJSON, err := json.Marshal(restoredLead)
+	if err != nil {
+		return nil
+	}
+	logData := entity.AuditLog{
+		UserIDAudit: userID,
+		Action:      "RESTORE_LEAD",
+		TargetID:    leadID,
+		OldData:     "-",
+		NewData:     string(newDataJSON),
+	}
+
+	s.AuditLog.CreateAuditLog(&logData)
 	return nil
 }

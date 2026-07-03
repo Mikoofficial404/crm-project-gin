@@ -38,6 +38,15 @@ type VerifyOTPRequest struct {
 	OTPCode string `json:"otp_code" binding:"required"`
 }
 
+type ForgetPasswordRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+type ResetPasswordRequest struct {
+	Token       string `json:"token" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required"`
+}
+
 func (h *UserHandler) Register(c *gin.Context) {
 	var req RegisterRequest
 
@@ -111,6 +120,36 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"status": "Password berhasil diubah"})
+}
+
+func (h *UserHandler) ForgotPassword(c *gin.Context) {
+	var req ForgetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := h.userService.ForgotPassword(req.Email)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "Email reset password telah dikirim"})
+}
+
+func (h *UserHandler) ResetPassword(c *gin.Context) {
+	var req ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	err := h.userService.ResetPassword(req.Token, req.NewPassword)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "Reset Password berhasil "})
+
 }
 
 func (h *UserHandler) VerifyOTP(c *gin.Context) {

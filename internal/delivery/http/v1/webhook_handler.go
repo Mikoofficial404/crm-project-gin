@@ -23,14 +23,15 @@ type GowaWebhookPayload struct {
 }
 
 type WebhookHandler struct {
-	leadService *service.LeadService
-	waService   *service.WhatsAppService
-	userRepo    *postgres.UserRepository
-	leadRepo    *postgres.LeadRepository
-	activitySvc *service.ActivityService
-	notifSvc    *service.NotificationService
-	redisClien  *redis.Client
-	aiService   *service.AIService
+	leadService    *service.LeadService
+	waService      *service.WhatsAppService
+	userRepo       *postgres.UserRepository
+	leadRepo       *postgres.LeadRepository
+	activitySvc    *service.ActivityService
+	notifSvc       *service.NotificationService
+	redisClien     *redis.Client
+	aiService      *service.AIService
+	contactService *service.ContactService
 }
 
 func NewWebhookHandler(
@@ -42,16 +43,18 @@ func NewWebhookHandler(
 	notifSvc *service.NotificationService,
 	redisClients *redis.Client,
 	aiService *service.AIService,
+	contactService *service.ContactService,
 ) *WebhookHandler {
 	return &WebhookHandler{
-		leadService: leadService,
-		waService:   waService,
-		userRepo:    userRepo,
-		leadRepo:    leadRepo,
-		activitySvc: activitySvc,
-		notifSvc:    notifSvc,
-		redisClien:  redisClients,
-		aiService:   aiService,
+		leadService:    leadService,
+		waService:      waService,
+		userRepo:       userRepo,
+		leadRepo:       leadRepo,
+		activitySvc:    activitySvc,
+		notifSvc:       notifSvc,
+		redisClien:     redisClients,
+		aiService:      aiService,
+		contactService: contactService,
 	}
 }
 
@@ -73,41 +76,55 @@ func (h *WebhookHandler) ReceiveWhatsApp(c *gin.Context) {
 
 	existingLead, _ := h.leadRepo.GetLeadByPhone(phone)
 	if existingLead == nil {
-		fmt.Println("[Webhook Klien baru terdeteksi! Membuat Lead otomatis...")
+		fmt.Println("[Webhook] Klien baru terdeteksi! Membuat Lead otomatis...")
+
+		// round-robin assign ke sales
 		salesAll, err := h.userRepo.GetAllUsers()
 		if err != nil {
-			fmt.Println("Error", err)
+			fmt.Println("Error get users:", err)
+			c.JSON(200, gin.H{"status": "ok"})
+			return
 		}
 		turnNo, err := h.redisClien.Get(context.Background(), "sales_turn_index").Int()
 		if err != nil {
 			turnNo = 0
 		}
-		assigneedID := salesAll[turnNo].ID
-		var newNo int
-		newNo = turnNo + 1
+		assignedID := salesAll[turnNo].ID
+		newNo := turnNo + 1
 		if newNo >= len(salesAll) {
 			newNo = 0
 		}
 		h.redisClien.Set(context.Background(), "sales_turn_index", newNo, 0)
-		newLead, errCreate := h.leadService.CreateLead(payload.Payload.FromName, "", phone, assigneedID, nil)
+
+		contact, errContact := h.contactService.FindOrCreateContact(payload.Payload.FromName, phone, assignedID)
+		if errContact != nil {
+			fmt.Println("[Webhook] Gagal FindOrCreateContact:", errContact)
+		}
+
+		var contactID *string
+		if contact != nil {
+			contactID = &contact.ID
+		}
+
+		newLead, errCreate := h.leadService.CreateLeadWithContact(payload.Payload.FromName, "", phone, assignedID, nil, contactID)
 		if errCreate != nil {
 			fmt.Println("Gagal membuat Lead otomatis:", errCreate)
 		} else {
-			h.activitySvc.CreateActivity("WhatsApp", payload.Payload.Body, newLead.ID, assigneedID, "")
+			h.activitySvc.CreateActivity("WhatsApp", payload.Payload.Body, newLead.ID, assignedID, "")
 			go func() {
 				aiReply, errAi := h.aiService.GenerateSalesReply(payload.Payload.FromName, payload.Payload.Body)
 				if errAi != nil {
 					fmt.Println("[AI Error]:", errAi)
 					h.waService.SendWA(phone, "Terima kasih telah menghubungi kami. Tim kami akan segera membalas pesan Anda.")
-					h.activitySvc.CreateActivity("Catatan", "Bot Reply: Terima kasih telah menghubungi kami...", newLead.ID, assigneedID, "")
+					h.activitySvc.CreateActivity("Catatan", "Bot Reply: Terima kasih telah menghubungi kami...", newLead.ID, assignedID, "")
 				} else {
 					h.waService.SendWA(phone, aiReply)
-					h.activitySvc.CreateActivity("Catatan", "AI Reply: "+aiReply, newLead.ID, assigneedID, "")
+					h.activitySvc.CreateActivity("Catatan", "AI Reply: "+aiReply, newLead.ID, assignedID, "")
 				}
 			}()
 		}
 	} else {
-		fmt.Printf("[Webhook] 👤 Klien Lama (%s) mengirim pesan.\n", existingLead.Name)
+		fmt.Printf("[Webhook] Klien Lama (%s) mengirim pesan.\n", existingLead.Name)
 		assigneeID := existingLead.AssignedTo
 		if assigneeID == "" || assigneeID == "00000000-0000-0000-0000-000000000000" {
 			firstUser, _ := h.userRepo.GetFirstUser()
@@ -131,11 +148,10 @@ func (h *WebhookHandler) ReceiveWhatsApp(c *gin.Context) {
 			wsMessage := fmt.Sprintf(`{"type":"new_whatsapp","title":"%s","message":"%s"}`, notifTitle, payload.Payload.Body)
 			errWs := websocket.SendMessageToUser(assigneeID, wsMessage)
 			if errWs != nil {
-				fmt.Printf("⚠️ User %s sedang offline, WebSocket dilewati.\n", assigneeID)
+				fmt.Printf("[Webhook] User %s sedang offline, WebSocket dilewati.\n", assigneeID)
 			} else {
-				fmt.Println("Sinyal WebSocket berhasil ditembakkan ke layar!")
+				fmt.Println("[Webhook] Sinyal WebSocket berhasil dikirim!")
 			}
-
 		}
 	}
 

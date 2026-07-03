@@ -6,7 +6,7 @@ import (
 	"crm-project/internal/delivery/websocket"
 	"crm-project/internal/models/entity"
 	"crm-project/internal/repository/postgres"
-	"crm-project/internal/worker"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -17,53 +17,88 @@ import (
 )
 
 type DealService struct {
-	deal        *postgres.DealRepository
-	AuditLog    *postgres.AuditRepository
-	AsynqClient *asynq.Client
-	invoiceRepo *postgres.InvoiceRepository
-	redisClient *redis.Client
+	deal            *postgres.DealRepository
+	AuditLog        *postgres.AuditRepository
+	AsynqClient     *asynq.Client
+	invoiceRepo     *postgres.InvoiceRepository
+	redisClient     *redis.Client
+	stageRepo       *postgres.PipelineStageRepository
+	dealProductRepo *postgres.DealProductRepository
 }
 
-func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.AuditRepository, asyncClient *asynq.Client, invoiceRepo *postgres.InvoiceRepository, redisClient *redis.Client) *DealService {
+func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.AuditRepository, asyncClient *asynq.Client, invoiceRepo *postgres.InvoiceRepository, redisClient *redis.Client, stageRepo *postgres.PipelineStageRepository, dealProductRepo *postgres.DealProductRepository) *DealService {
 	return &DealService{
-		deal:        dealRepo,
-		AuditLog:    auditRepo,
-		AsynqClient: asyncClient,
-		invoiceRepo: invoiceRepo,
-		redisClient: redisClient,
+		deal:            dealRepo,
+		AuditLog:        auditRepo,
+		AsynqClient:     asyncClient,
+		invoiceRepo:     invoiceRepo,
+		redisClient:     redisClient,
+		stageRepo:       stageRepo,
+		dealProductRepo: dealProductRepo,
 	}
 }
 
-func (s *DealService) CreateDeal(name string, value float64, leadID string, userID string) (*entity.Deal, error) {
+func (s *DealService) CreateDeal(name string, value float64, leadID string, userID string, pipelineID string, stageID string) (*entity.Deal, error) {
+	if name == "" || leadID == "" || pipelineID == "" || stageID == "" {
+		return nil, errors.New("name, lead_id, pipeline_id, dan stage_id wajib diisi")
+	}
+
 	deal := entity.Deal{
 		Name:       name,
 		Value:      value,
-		Stage:      "PROSPECTING",
+		PipelineID: pipelineID,
+		StageID:    stageID,
 		LeadID:     leadID,
 		AssignedTo: userID,
 	}
 
-	result, err := s.deal.CreateDeal(&deal)
+	NewDeal, err := s.deal.CreateDeal(&deal)
 	if err != nil {
 		return nil, err
 	}
 
 	s.redisClient.Del(context.Background(), "crm_dashboard_stats")
 
-	return result, nil
+	NewDataJson, err := json.Marshal(NewDeal)
+	if err != nil {
+		return nil, err
+	}
+	logData := entity.AuditLog{
+		UserIDAudit: userID,
+		Action:      "CREATE-DEAL",
+		TargetID:    NewDeal.ID,
+		OldData:     "-",
+		NewData:     string(NewDataJson),
+	}
+	s.AuditLog.CreateAuditLog(&logData)
+	return NewDeal, nil
 }
 
-func (s *DealService) GetDeals(userID string, role string, page int, limit int, search string, stage string) ([]entity.Deal, int64, error) {
+func (s *DealService) GetDeals(userID string, role string, page int, limit int, search string, stageID string, pipelineID string) ([]entity.Deal, int64, error) {
 	if role == "sales" {
-		return s.deal.GetDealByUserId(userID, page, limit, search, stage)
+		return s.deal.GetDealByUserId(userID, page, limit, search, stageID, pipelineID)
 	} else {
-		return s.deal.GetAllDeals(page, limit, search, stage)
+		return s.deal.GetAllDeals(page, limit, search, stageID, pipelineID)
 	}
 }
 
-func (s *DealService) UpdateStage(dealID string, status string, userID string, role string) error {
+func (s *DealService) UpdateInvoiceStatus(invoideID string, status string) error {
+	if invoideID == "" {
+		return errors.New("ID invoice wajib diisi")
+	}
+	if status != "PAID" && status != "OVERDUE" {
+		return errors.New("status invoice tidak valid, hanya boleh PAID atau OVERDUE")
+	}
+	_, err := s.invoiceRepo.UpdateStatus(invoideID, status)
+	if err != nil {
+		return err
+	}
+	return err
+}
 
-	if dealID == "" || status == "" || userID == "" || role == "" {
+func (s *DealService) UpdateStage(dealID string, stageID string, userID string, role string) error {
+
+	if dealID == "" || stageID == "" || userID == "" || role == "" {
 		return errors.New("semua field wajib diisi")
 	}
 
@@ -77,24 +112,53 @@ func (s *DealService) UpdateStage(dealID string, status string, userID string, r
 			return errors.New("unauthorized: ini bukan deal Anda")
 		}
 	}
-	if status == "WON" {
-		task, errTask := worker.NewEmailDeliveryTask(
-			"klien@gmail.com",
-			"SELAMAT! Deal Anda Berhasil!",
-			"<h1>Terima Kasih!</h1><p>Kami sangat senang bekerja sama dengan Anda.</p>",
-		)
-		if errTask == nil {
-			s.AsynqClient.Enqueue(task)
-		}
-		websocket.SendMessageToUser(userID, "SELAMAT! Anda baru saja memenangkan Deal!!")
-		subTotal := deal.Value
-		pajakPpn := subTotal * 0.11
-		total := subTotal + pajakPpn
-		var InvoiceNo string
-		InvoiceNo = "INV"
-		wrapTeks := fmt.Sprintf("%s-%s", InvoiceNo, dealID)
+	if stageID == deal.StageID {
+		return errors.New("stage sudah sama, tidak ada perubahan")
+	}
+	dealById, err := s.deal.GetDealByID(dealID)
+	if err != nil {
+		return err
+	}
+
+	oldData := dealById.StageID
+
+	errUpdate := s.deal.UpdateStage(dealID, stageID)
+	if errUpdate != nil {
+		return errUpdate
+	}
+
+	stage, err := s.stageRepo.GetStageByID(stageID)
+	if err == nil && stage.IsClosedWon {
+
+		websocket.SendMessageToUser(deal.AssignedTo, "SELAMAT! Anda baru saja memenangkan Deal!!")
+
 		existingInvoice, _ := s.invoiceRepo.GetInvoiceByDealID(dealID)
 		if existingInvoice == nil {
+			wrapTeks := fmt.Sprintf("INV-%s", dealID)
+
+			dealProducts, _ := s.dealProductRepo.GetProductsByDealID(dealID)
+
+			var subTotal float64
+			var invoiceItems []entity.InvoiceItem
+
+			if len(dealProducts) > 0 {
+				for _, dp := range dealProducts {
+					subTotal += dp.SubTotal
+					invoiceItems = append(invoiceItems, entity.InvoiceItem{
+						ProductID: dp.ProductID,
+						Quantity:  dp.Quantity,
+						UnitPrice: dp.UnitPrice,
+						SubTotal:  dp.SubTotal,
+					})
+				}
+			} else {
+
+				subTotal = deal.Value
+			}
+
+			pajakPpn := subTotal * 0.11
+			total := subTotal + pajakPpn
+
 			invoice := entity.Invoice{
 				InvoiceNo:  wrapTeks,
 				DealID:     dealID,
@@ -102,6 +166,7 @@ func (s *DealService) UpdateStage(dealID string, status string, userID string, r
 				GrandTotal: total,
 				Tax:        pajakPpn,
 				Status:     "UNPAID",
+				Items:      invoiceItems,
 			}
 			_, err := s.invoiceRepo.CreateInvoice(&invoice)
 			if err != nil {
@@ -109,25 +174,14 @@ func (s *DealService) UpdateStage(dealID string, status string, userID string, r
 			}
 		}
 	}
-	dealById, err := s.deal.GetDealByID(dealID)
-	if err != nil {
-		return err
-	}
 
-	oldData := dealById.Stage
-
-	errUpdate := s.deal.UpdateStage(dealID, status)
-	if errUpdate != nil {
-		return errUpdate
-	}
-	newData := status
-	messages := fmt.Sprintf("Merubah status Deal menjadi %s", status)
+	messages := fmt.Sprintf("Merubah stage Deal menjadi %s", stageID)
 	logData := entity.AuditLog{
 		UserIDAudit: userID,
 		Action:      messages,
 		TargetID:    dealID,
 		OldData:     oldData,
-		NewData:     newData,
+		NewData:     stageID,
 	}
 
 	s.AuditLog.CreateAuditLog(&logData)
@@ -142,13 +196,13 @@ func (s *DealService) DeleteDeal(dealID string, userID string, role string) erro
 		return errors.New("ID deal wajib diisi")
 	}
 
-	deal, err := s.deal.GetDealByID(dealID)
+	oldDeal, err := s.deal.GetDealByID(dealID)
 	if err != nil {
 		return fmt.Errorf("deal tidak ditemukan: %w", err)
 	}
 
 	if role == "sales" {
-		if deal.AssignedTo != userID {
+		if oldDeal.AssignedTo != userID {
 			return errors.New("unauthorized: ini bukan deal Anda")
 		}
 	}
@@ -157,11 +211,23 @@ func (s *DealService) DeleteDeal(dealID string, userID string, role string) erro
 	if err == nil {
 		s.redisClient.Del(context.Background(), "crm_dashboard_stats")
 	}
+	oldDataJSON, err := json.Marshal(oldDeal)
+	if err != nil {
+		return nil
+	}
+	logData := entity.AuditLog{
+		UserIDAudit: userID,
+		Action:      "DELETE-DEAL",
+		TargetID:    dealID,
+		OldData:     string(oldDataJSON),
+		NewData:     "-",
+	}
+	s.AuditLog.CreateAuditLog(&logData)
 	return err
 }
 
 func (s *DealService) ExportDealsToExcel() (*bytes.Buffer, error) {
-	data, _, err := s.deal.GetAllDeals(1, 1000, "", "")
+	data, _, err := s.deal.GetAllDeals(1, 1000, "", "", "")
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +251,7 @@ func (s *DealService) ExportDealsToExcel() (*bytes.Buffer, error) {
 		row := i + 2
 		f.SetCellValue("Sheet1", fmt.Sprintf("A%d", row), deal.ID)
 		f.SetCellValue("Sheet1", fmt.Sprintf("B%d", row), deal.Name)
-		f.SetCellValue("Sheet1", fmt.Sprintf("C%d", row), deal.Stage)
+		f.SetCellValue("Sheet1", fmt.Sprintf("C%d", row), deal.Stage.Name)
 		f.SetCellValue("Sheet1", fmt.Sprintf("D%d", row), deal.Value)
 	}
 
@@ -247,7 +313,7 @@ func (s *DealService) GenerateInvoicePDF(dealID string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 func (s *DealService) ExportDealsToPDF() ([]byte, error) {
-	data, _, err := s.deal.GetAllDeals(1, 10, "", "")
+	data, _, err := s.deal.GetAllDeals(1, 10, "", "", "")
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +330,7 @@ func (s *DealService) ExportDealsToPDF() ([]byte, error) {
 	pdf.SetFont("Arial", "", 11)
 	for _, value := range data {
 		pdf.Cell(60, 10, value.Name)
-		pdf.Cell(60, 10, value.Stage)
+		pdf.Cell(60, 10, value.Stage.Name)
 		pdf.Cell(50, 10, formatRupiah(value.Value))
 		pdf.Ln(8)
 	}
@@ -318,4 +384,58 @@ func (s *DealService) UpdateDeal(dealID string, name string, value float64, user
 	s.redisClient.Del(context.Background(), "crm_dashboard_stats")
 
 	return nil
+}
+
+func (s *DealService) AssignProductToDeal(dealID, productID string, quantity int, unitPrice float64, userID, role string) (*entity.DealProduct, error) {
+	if dealID == "" || productID == "" {
+		return nil, errors.New("deal ID dan product ID wajib diisi")
+	}
+	if quantity <= 0 {
+		return nil, errors.New("quantity harus lebih dari 0")
+	}
+	if unitPrice < 0 {
+		return nil, errors.New("unit price tidak boleh negatif")
+	}
+
+	deal, err := s.deal.GetDealByID(dealID)
+	if err != nil {
+		return nil, fmt.Errorf("deal tidak ditemukan: %w", err)
+	}
+	if role == "sales" && deal.AssignedTo != userID {
+		return nil, errors.New("unauthorized: ini bukan deal Anda")
+	}
+
+	subTotal := float64(quantity) * unitPrice
+	dealProduct := &entity.DealProduct{
+		DealID:    dealID,
+		ProductID: productID,
+		Quantity:  quantity,
+		UnitPrice: unitPrice,
+		SubTotal:  subTotal,
+	}
+
+	return s.dealProductRepo.AssignProduct(dealProduct)
+}
+
+func (s *DealService) RemoveProductFromDeal(dealID, productID, userID, role string) error {
+	if dealID == "" || productID == "" {
+		return errors.New("deal ID dan product ID wajib diisi")
+	}
+
+	deal, err := s.deal.GetDealByID(dealID)
+	if err != nil {
+		return fmt.Errorf("deal tidak ditemukan: %w", err)
+	}
+	if role == "sales" && deal.AssignedTo != userID {
+		return errors.New("unauthorized: ini bukan deal Anda")
+	}
+
+	return s.dealProductRepo.RemoveProduct(dealID, productID)
+}
+
+func (s *DealService) GetDealProducts(dealID string) ([]entity.DealProduct, error) {
+	if dealID == "" {
+		return nil, errors.New("deal ID wajib diisi")
+	}
+	return s.dealProductRepo.GetProductsByDealID(dealID)
 }

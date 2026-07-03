@@ -34,19 +34,32 @@ func (r *DealRepository) GetDealByID(dealID string) (*entity.Deal, error) {
 	return &deal, nil
 }
 
-func (r *DealRepository) GetAllDeals(page int, limit int, search string, stage string) ([]entity.Deal, int64, error) {
+func (r *DealRepository) GetAllDeals(page int, limit int, search string, stageID string, pipelineID string) ([]entity.Deal, int64, error) {
 	var deals []entity.Deal
 	var total int64
 
-	query := r.dbGorm.Model(&entity.Deal{}).Preload("Lead")
+	query := r.dbGorm.Model(&entity.Deal{}).Preload("Lead").Preload("Stage").Preload("Pipeline")
 	if search != "" {
 		query = query.Where("name ILIKE ?", "%"+search+"%")
 	}
-	if stage != "" {
-		query = query.Where("stage = ?", stage)
+	if stageID != "" {
+		query = query.Where("stage_id = ?", stageID)
+	}
+	if pipelineID != "" {
+		query = query.Where("pipeline_id = ?", pipelineID)
 	}
 
-	query.Count(&total)
+	countQuery := r.dbGorm.Model(&entity.Deal{})
+	if search != "" {
+		countQuery = countQuery.Where("name ILIKE ?", "%"+search+"%")
+	}
+	if stageID != "" {
+		countQuery = countQuery.Where("stage_id = ?", stageID)
+	}
+	if pipelineID != "" {
+		countQuery = countQuery.Where("pipeline_id = ?", pipelineID)
+	}
+	countQuery.Count(&total)
 
 	offset := (page - 1) * limit
 	err := query.Offset(offset).Limit(limit).Order("position ASC").Find(&deals).Error
@@ -56,20 +69,32 @@ func (r *DealRepository) GetAllDeals(page int, limit int, search string, stage s
 	return deals, total, nil
 }
 
-func (r *DealRepository) GetDealByUserId(userId string, page int, limit int, search string, stage string) ([]entity.Deal, int64, error) {
-	ctx := context.Background()
+func (r *DealRepository) GetDealByUserId(userId string, page int, limit int, search string, stageID string, pipelineID string) ([]entity.Deal, int64, error) {
 	var deals []entity.Deal
 	var total int64
 
-	query := r.dbGorm.WithContext(ctx).Model(&entity.Deal{}).Preload("Lead").Where("assigned_to = ?", userId)
+	query := r.dbGorm.Model(&entity.Deal{}).Preload("Lead").Preload("Stage").Preload("Pipeline").Where("assigned_to = ?", userId)
 	if search != "" {
 		query = query.Where("name ILIKE ?", "%"+search+"%")
 	}
-	if stage != "" {
-		query = query.Where("stage = ?", stage)
+	if stageID != "" {
+		query = query.Where("stage_id = ?", stageID)
+	}
+	if pipelineID != "" {
+		query = query.Where("pipeline_id = ?", pipelineID)
 	}
 
-	query.Count(&total)
+	countQuery := r.dbGorm.Model(&entity.Deal{}).Where("assigned_to = ?", userId)
+	if search != "" {
+		countQuery = countQuery.Where("name ILIKE ?", "%"+search+"%")
+	}
+	if stageID != "" {
+		countQuery = countQuery.Where("stage_id = ?", stageID)
+	}
+	if pipelineID != "" {
+		countQuery = countQuery.Where("pipeline_id = ?", pipelineID)
+	}
+	countQuery.Count(&total)
 
 	offset := (page - 1) * limit
 	err := query.Offset(offset).Limit(limit).Order("position ASC").Find(&deals).Error
@@ -79,10 +104,8 @@ func (r *DealRepository) GetDealByUserId(userId string, page int, limit int, sea
 	return deals, total, nil
 }
 
-func (r *DealRepository) UpdateStage(dealID string, stage string) error {
-	ctx := context.Background()
-	var deals entity.Deal
-	err := r.dbGorm.WithContext(ctx).Model(&deals).Where("id = ?", dealID).Update("stage", stage).Error
+func (r *DealRepository) UpdateStage(dealID string, stageID string) error {
+	err := r.dbGorm.Model(&entity.Deal{}).Where("id = ?", dealID).Update("stage_id", stageID).Error
 	if err != nil {
 		return err
 	}

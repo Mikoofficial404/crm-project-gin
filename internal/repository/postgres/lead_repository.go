@@ -28,7 +28,7 @@ func (r *LeadRepository) GetAllLeads(page int, limit int, search string, status 
 	var leads []entity.Lead
 	var total int64
 
-	query := r.dbGorm.Model(&entity.Lead{})
+	query := r.dbGorm.Model(&entity.Lead{}).Preload("Contact")
 	if search != "" {
 		query = query.Where("name ILIKE ? OR email ILIKE ?", "%"+search+"%", "%"+search+"%")
 	}
@@ -36,7 +36,9 @@ func (r *LeadRepository) GetAllLeads(page int, limit int, search string, status 
 		query = query.Where("status = ?", status)
 	}
 
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 
 	offset := (page - 1) * limit
 	err := query.Offset(offset).Limit(limit).Order("created_at DESC").Find(&leads).Error
@@ -51,7 +53,7 @@ func (r *LeadRepository) GetLeadsByUserId(userID string, page int, limit int, se
 	var leads []entity.Lead
 	var total int64
 
-	query := r.dbGorm.WithContext(ctx).Model(&entity.Lead{}).Where("assigned_to = ?", userID)
+	query := r.dbGorm.WithContext(ctx).Model(&entity.Lead{}).Preload("Contact").Where("assigned_to = ?", userID)
 	if search != "" {
 		query = query.Where("name ILIKE ? OR email ILIKE ?", "%"+search+"%", "%"+search+"%")
 	}
@@ -59,7 +61,9 @@ func (r *LeadRepository) GetLeadsByUserId(userID string, page int, limit int, se
 		query = query.Where("status = ?", status)
 	}
 
-	query.Count(&total)
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
 
 	offset := (page - 1) * limit
 	err := query.Offset(offset).Limit(limit).Order("created_at DESC").Find(&leads).Error
@@ -82,7 +86,7 @@ func (r *LeadRepository) UpdateStatus(leadID string, status string) error {
 func (r *LeadRepository) GetLeadByID(leadID string) (*entity.Lead, error) {
 	ctx := context.Background()
 	var lead entity.Lead
-	err := r.dbGorm.WithContext(ctx).Where("id = ?", leadID).First(&lead).Error
+	err := r.dbGorm.WithContext(ctx).Preload("Contact").Where("id = ?", leadID).First(&lead).Error
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +96,7 @@ func (r *LeadRepository) GetLeadByID(leadID string) (*entity.Lead, error) {
 func (r *LeadRepository) GetLeadByPhone(phone string) (*entity.Lead, error) {
 	ctx := context.Background()
 	var lead entity.Lead
-	err := r.dbGorm.WithContext(ctx).Where("phone LIKE ?", "%"+phone+"%").First(&lead).Error
+	err := r.dbGorm.WithContext(ctx).Preload("Contact").Where("phone = ?", phone).First(&lead).Error
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +143,7 @@ func (r *LeadRepository) RestoreLead(leadID string) error {
 func (r *LeadRepository) SearchLeads(keyword string) ([]entity.Lead, error) {
 	ctx := context.Background()
 	var leads []entity.Lead
-	err := r.dbGorm.WithContext(ctx).Where("name ILIKE ?", "%"+keyword+"%").Find(&leads).Error
+	err := r.dbGorm.WithContext(ctx).Preload("Contact").Where("name ILIKE ?", "%"+keyword+"%").Find(&leads).Error
 	if err != nil {
 		return nil, err
 	}

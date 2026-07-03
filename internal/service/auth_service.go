@@ -4,6 +4,7 @@ import (
 	"context"
 	"crm-project/internal/models/entity"
 	"crm-project/internal/repository/postgres"
+	"crm-project/internal/worker"
 	"crm-project/pkg/jwt"
 	"encoding/json"
 	"fmt"
@@ -13,7 +14,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
 	"github.com/pquerna/otp/totp"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -33,14 +36,18 @@ var GoogleOAuthConfig = &oauth2.Config{
 }
 
 type UserService struct {
-	user *postgres.UserRepository
+	user  *postgres.UserRepository
+	rdb   *redis.Client
+	asynq *asynq.Client
 }
 
-func NewUserService(userRepo *postgres.UserRepository) *UserService {
+func NewUserService(userRepo *postgres.UserRepository, rdb *redis.Client, clientAsynq *asynq.Client) *UserService {
 	GoogleOAuthConfig.ClientID = os.Getenv("GOOGLE_CLIENT_ID")
 	GoogleOAuthConfig.ClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
 	return &UserService{
-		user: userRepo,
+		user:  userRepo,
+		rdb:   rdb,
+		asynq: clientAsynq,
 	}
 }
 
@@ -112,6 +119,61 @@ func (s *UserService) ChangePassword(userID string, oldPassword string, newPassw
 	}
 
 	return s.user.UpdatePassword(userID, newHash)
+}
+
+func (s *UserService) ForgotPassword(email string) error {
+	ctx := context.Background()
+	user, err := s.user.FindByEmail(email)
+	if err != nil {
+		return fmt.Errorf("user tidak ditemukan")
+	}
+	token, err := jwt.MakeRefreshToken()
+	if err != nil {
+		return fmt.Errorf("Token gagal")
+	}
+	err = s.rdb.Set(ctx, "reset:"+token, user.ID, 30*time.Minute).Err()
+	if err != nil {
+		return fmt.Errorf("gagal menyimpan token reset")
+	}
+
+	subject := "Reset Password CRM"
+	body := fmt.Sprintf(`
+		<h2>Reset Password</h2>
+		<p>Halo %s,</p>
+		<p>Kami menerima permintaan reset password untuk akun Anda.</p>
+		<p>Gunakan token berikut untuk mereset password Anda (berlaku 30 menit):</p>
+		<p><strong>%s</strong></p>
+		<p>Jika Anda tidak meminta reset password, abaikan email ini.</p>
+	`, user.Name, token)
+
+	task, err := worker.NewEmailDeliveryTask(user.Email, subject, body)
+	if err != nil {
+		return fmt.Errorf("gagal membuat email task")
+	}
+	_, err = s.asynq.Enqueue(task)
+	if err != nil {
+		return fmt.Errorf("gagal mengirim email")
+	}
+
+	return nil
+}
+
+func (s *UserService) ResetPassword(token string, newPassword string) error {
+	ctx := context.Background()
+	tokens, err := s.rdb.Get(ctx, "reset:"+token).Result()
+	if err != nil {
+		return fmt.Errorf("token invalid or expired")
+	}
+	hashPassword, err := jwt.HashPassword(newPassword)
+	if err != nil {
+		return fmt.Errorf("Hash password gagal")
+	}
+	err = s.user.UpdatePassword(tokens, hashPassword)
+	if err != nil {
+		return fmt.Errorf("Update Password Gagal")
+	}
+	delTokens := s.rdb.Del(ctx, "reset:"+token)
+	return delTokens.Err()
 }
 
 func (s *UserService) VerifyOTP(userID string, otpCode string) (string, error) {
