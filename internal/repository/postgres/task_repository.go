@@ -78,6 +78,19 @@ func (r *TaskRepository) DeleteTask(taskID string) error {
 	return r.dbgorm.Where("id = ?", taskID).Delete(&entity.Task{}).Error
 }
 
+func (r *TaskRepository) GetTrashedTasks() ([]entity.Task, error) {
+	var tasks []entity.Task
+	err := r.dbgorm.Unscoped().Where("deleted_at IS NOT NULL").Find(&tasks).Error
+	if err != nil {
+		return nil, err
+	}
+	return tasks, nil
+}
+
+func (r *TaskRepository) RestoreTask(taskID string) error {
+	return r.dbgorm.Unscoped().Where("id = ?", taskID).Update("deleted_at", nil).Error
+}
+
 func (r *TaskRepository) MarkAsDone(taskID string) error {
 	return r.dbgorm.Model(&entity.Task{}).Where("id = ?", taskID).Update("status", "DONE").Error
 }

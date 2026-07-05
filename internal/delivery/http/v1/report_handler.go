@@ -2,6 +2,7 @@ package v1
 
 import (
 	"crm-project/internal/service"
+	"crm-project/pkg/response"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -16,67 +17,46 @@ func NewReportHandler(reportService *service.ReportService) *ReportHandler {
 }
 
 func (h *ReportHandler) GetSalesSummary(c *gin.Context) {
-	startDate := c.Query("start_date")
-	endDate := c.Query("end_date")
-
-	result, err := h.reportService.GetSalesSummary(startDate, endDate)
+	result, err := h.reportService.GetSalesSummary(c.Query("start_date"), c.Query("end_date"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Berhasil mengambil sales summary", "data": result})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil sales summary", result))
 }
 
 func (h *ReportHandler) GetPipelineReport(c *gin.Context) {
-	startDate := c.Query("start_date")
-	endDate := c.Query("end_date")
-	pipelineID := c.Query("pipeline_id")
-
-	result, err := h.reportService.GetPipelineReport(startDate, endDate, pipelineID)
+	result, err := h.reportService.GetPipelineReport(c.Query("start_date"), c.Query("end_date"), c.Query("pipeline_id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Berhasil mengambil pipeline report", "data": result})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil pipeline report", result))
 }
 
 func (h *ReportHandler) GetSalesPerformance(c *gin.Context) {
-	startDate := c.Query("start_date")
-	endDate := c.Query("end_date")
-
-	result, err := h.reportService.GetSalesPerformance(startDate, endDate)
+	result, err := h.reportService.GetSalesPerformance(c.Query("start_date"), c.Query("end_date"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Berhasil mengambil sales performance", "data": result})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil sales performance", result))
 }
 
 func (h *ReportHandler) GetLeadSourceReport(c *gin.Context) {
-	startDate := c.Query("start_date")
-	endDate := c.Query("end_date")
-
-	result, err := h.reportService.GetLeadSourceReport(startDate, endDate)
+	result, err := h.reportService.GetLeadSourceReport(c.Query("start_date"), c.Query("end_date"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Berhasil mengambil lead source report", "data": result})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil lead source report", result))
 }
 
 func (h *ReportHandler) GetActivityReport(c *gin.Context) {
-	startDate := c.Query("start_date")
-	endDate := c.Query("end_date")
-
-	result, err := h.reportService.GetActivityReport(startDate, endDate)
+	result, err := h.reportService.GetActivityReport(c.Query("start_date"), c.Query("end_date"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Berhasil mengambil activity report", "data": result})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil activity report", result))
 }

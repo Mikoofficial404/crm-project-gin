@@ -33,17 +33,23 @@ func (s *ActivityService) CreateActivity(types string, notes string, leadID stri
 	return result, nil
 }
 
-func (s *ActivityService) GetActivitiesByLeadID(leadID string, role string) ([]entity.Activity, error) {
+func (s *ActivityService) GetActivitiesByLeadID(leadID string, role string, page int, limit int) ([]entity.Activity, int, error) {
 	if leadID == "" || role == "" {
-		return nil, errors.New("semua field wajib diisi")
+		return nil, 0, errors.New("semua field wajib diisi")
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 10
 	}
 
-	load, err := s.activity.GetActivitiesByLeadID(leadID)
+	activities, total, err := s.activity.GetActivitiesByLeadID(leadID, page, limit)
 	if err != nil {
-		return nil, fmt.Errorf("prospek tidak ditemukan: %w", err)
+		return nil, 0, fmt.Errorf("aktivitas tidak ditemukan: %w", err)
 	}
 
-	return load, nil
+	return activities, total, nil
 }
 
 func (s *ActivityService) UpdateActivity(activityID string, notes string, userID string, role string) error {

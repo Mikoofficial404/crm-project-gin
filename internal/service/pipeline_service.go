@@ -95,9 +95,13 @@ func (s *PipelineService) DeletePipeline(pipelineID string) error {
 	return s.pipelineRepo.DeletePipeline(pipelineID)
 }
 
-func (s *PipelineService) AddStage(pipelineID, name, color string, isClosedWon, isClosedLost bool) (*entity.PipelineStage, error) {
+func (s *PipelineService) AddStage(pipelineID, name, color string, isClosedWon, isClosedLost bool, probability int) (*entity.PipelineStage, error) {
 	if pipelineID == "" || name == "" {
 		return nil, errors.New("pipeline_id dan name wajib diisi")
+	}
+
+	if probability < 0 || probability > 100 {
+		return nil, errors.New("probability harus antara 0 dan 100")
 	}
 
 	_, err := s.pipelineRepo.GetPipelineByID(pipelineID)
@@ -118,6 +122,7 @@ func (s *PipelineService) AddStage(pipelineID, name, color string, isClosedWon, 
 		StageOrder:   nextOrder,
 		IsClosedWon:  isClosedWon,
 		IsClosedLost: isClosedLost,
+		Probability:  probability,
 	}
 	return s.pipelineStageRepo.CreatePipelineStage(&stage)
 }

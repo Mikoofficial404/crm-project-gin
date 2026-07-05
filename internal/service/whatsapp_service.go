@@ -2,11 +2,14 @@ package service
 
 import (
 	"bytes"
+	"crm-project/pkg/utils"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/sirupsen/logrus"
 )
 
 type WhatsAppService struct {
@@ -26,9 +29,12 @@ func NewWhatsAppService(gowaURL, deviceID, basicAuth string) *WhatsAppService {
 }
 
 func (s *WhatsAppService) SendWA(phone string, textMessage string) error {
+
+	normalizedPhone := utils.NormalizePhone(phone)
+
 	payload := map[string]interface{}{
 		"device_id": s.DeviceID,
-		"phone":     phone,
+		"phone":     normalizedPhone,
 		"message":   textMessage,
 	}
 
@@ -59,6 +65,6 @@ func (s *WhatsAppService) SendWA(phone string, textMessage string) error {
 		return fmt.Errorf("gagal kirim WA (Status %d): %s", resp.StatusCode, string(body))
 	}
 
-	fmt.Printf("[WhatsAppService] Berhasil mengirim WA ke Klien %s\n", phone)
+	logrus.WithField("phone", phone).Info("[WhatsAppService] Berhasil mengirim WA ke Klien")
 	return nil
 }

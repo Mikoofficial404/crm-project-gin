@@ -15,6 +15,10 @@ type DashboardService struct {
 	redisClient *redis.Client
 }
 
+type DashboardStats struct {
+	TotalContacts int64
+}
+
 func NewDashboardService(repo *postgres.DashboardRepository, redisClient *redis.Client) *DashboardService {
 	return &DashboardService{
 		repo:        repo,
@@ -34,6 +38,11 @@ func (s *DashboardService) GetStats() (*postgres.DashboardStats, error) {
 		}
 	}
 
+	totalContacts, err := s.repo.GetTotalContacts()
+	if err != nil {
+		return nil, err
+	}
+
 	stats, err := s.repo.GetStats()
 	if err != nil {
 		return nil, err
@@ -42,7 +51,14 @@ func (s *DashboardService) GetStats() (*postgres.DashboardStats, error) {
 	dataJson, _ := json.Marshal(stats)
 	s.redisClient.Set(ctx, cacheKey, dataJson, 5*time.Minute)
 
-	return stats, nil
+	return &postgres.DashboardStats{
+		TotalLeads:       totalContacts,
+		TotalDeals:       stats.TotalDeals,
+		TotalWonDeals:    stats.TotalWonDeals,
+		TotalRevenueWon:  stats.TotalRevenueWon,
+		PotentialRevenue: stats.PotentialRevenue,
+		TotalContacts:    totalContacts,
+	}, nil
 }
 
 func (s *DashboardService) GetForecastingAnalytics() (*entity.AnalyticsResponse, error) {

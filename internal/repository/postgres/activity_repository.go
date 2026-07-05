@@ -24,16 +24,23 @@ func (r *ActivityRepository) CreateActivity(activity *entity.Activity) (*entity.
 	return activity, nil
 }
 
-func (r *ActivityRepository) GetActivitiesByLeadID(leadId string) ([]entity.Activity, error) {
+func (r *ActivityRepository) GetActivitiesByLeadID(leadId string, page int, limit int) ([]entity.Activity, int, error) {
 	ctx := context.Background()
-	var activity []entity.Activity
-	err := r.dbGorm.WithContext(ctx).
-		Where("lead_id = ?", leadId).
-		Find(&activity).Error
-	if err != nil {
-		return nil, err
+	var activities []entity.Activity
+	var total int64
+
+	baseQuery := r.dbGorm.WithContext(ctx).Model(&entity.Activity{}).Where("lead_id = ?", leadId)
+
+	if err := baseQuery.Count(&total).Error; err != nil {
+		return nil, 0, err
 	}
-	return activity, nil
+
+	offset := (page - 1) * limit
+	err := baseQuery.Offset(offset).Limit(limit).Order("created_at DESC").Find(&activities).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	return activities, int(total), nil
 }
 
 func (r *ActivityRepository) GetActivityByID(id string) (*entity.Activity, error) {

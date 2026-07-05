@@ -24,9 +24,10 @@ type DealService struct {
 	redisClient     *redis.Client
 	stageRepo       *postgres.PipelineStageRepository
 	dealProductRepo *postgres.DealProductRepository
+	dealHistoryRepo *postgres.DealHistoryRepository
 }
 
-func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.AuditRepository, asyncClient *asynq.Client, invoiceRepo *postgres.InvoiceRepository, redisClient *redis.Client, stageRepo *postgres.PipelineStageRepository, dealProductRepo *postgres.DealProductRepository) *DealService {
+func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.AuditRepository, asyncClient *asynq.Client, invoiceRepo *postgres.InvoiceRepository, redisClient *redis.Client, stageRepo *postgres.PipelineStageRepository, dealProductRepo *postgres.DealProductRepository, dealHistoryRepo *postgres.DealHistoryRepository) *DealService {
 	return &DealService{
 		deal:            dealRepo,
 		AuditLog:        auditRepo,
@@ -35,6 +36,7 @@ func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.Audit
 		redisClient:     redisClient,
 		stageRepo:       stageRepo,
 		dealProductRepo: dealProductRepo,
+		dealHistoryRepo: dealHistoryRepo,
 	}
 }
 
@@ -74,11 +76,11 @@ func (s *DealService) CreateDeal(name string, value float64, leadID string, user
 	return NewDeal, nil
 }
 
-func (s *DealService) GetDeals(userID string, role string, page int, limit int, search string, stageID string, pipelineID string) ([]entity.Deal, int64, error) {
+func (s *DealService) GetDeals(userID string, role string, page int, limit int, search string, stageID string, pipelineID string, startDate, endDate string) ([]entity.Deal, int64, error) {
 	if role == "sales" {
-		return s.deal.GetDealByUserId(userID, page, limit, search, stageID, pipelineID)
+		return s.deal.GetDealByUserId(userID, page, limit, search, stageID, pipelineID, startDate, endDate)
 	} else {
-		return s.deal.GetAllDeals(page, limit, search, stageID, pipelineID)
+		return s.deal.GetAllDeals(page, limit, search, stageID, pipelineID, startDate, endDate)
 	}
 }
 
@@ -187,6 +189,14 @@ func (s *DealService) UpdateStage(dealID string, stageID string, userID string, 
 	s.AuditLog.CreateAuditLog(&logData)
 
 	s.redisClient.Del(context.Background(), "crm_dashboard_stats")
+	dealHistories, err := s.dealHistoryRepo.GetHistoriesByDealID(dealID)
+	if err != nil {
+		return fmt.Errorf("gagal mendapatkan histori deal: %w", err)
+	}
+
+	for _, history := range dealHistories {
+		fmt.Println(history)
+	}
 
 	return nil
 }
@@ -227,7 +237,7 @@ func (s *DealService) DeleteDeal(dealID string, userID string, role string) erro
 }
 
 func (s *DealService) ExportDealsToExcel() (*bytes.Buffer, error) {
-	data, _, err := s.deal.GetAllDeals(1, 1000, "", "", "")
+	data, _, err := s.deal.GetAllDeals(1, 1000, "", "", "", "", "")
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +274,6 @@ func (s *DealService) ExportDealsToExcel() (*bytes.Buffer, error) {
 }
 
 func (s *DealService) GenerateInvoicePDF(dealID string) ([]byte, error) {
-
 	invoice, err := s.invoiceRepo.GetInvoiceByDealID(dealID)
 	if err != nil {
 		return nil, fmt.Errorf("invoice tidak ditemukan: %w", err)
@@ -301,9 +310,38 @@ func (s *DealService) GenerateInvoicePDF(dealID string) ([]byte, error) {
 	pdf.Cell(0, 10, fmt.Sprintf("Rp %.2f", invoice.GrandTotal))
 	pdf.Ln(20)
 
+	widths := []float64{80, 20, 45, 45}
+	headers := []string{"Product Name", "Qty", "Unit Price", "Subtotal"}
+
+	pdf.SetFont("Arial", "B", 10)
+	for i, h := range headers {
+		pdf.CellFormat(widths[i], 8, h, "1", 0, "C", false, 0, "")
+	}
+	pdf.Ln(-1)
+
+	var total float64
+	pdf.SetFont("Arial", "", 10)
+	for _, item := range invoice.Items {
+		subtotal := float64(item.Quantity) * item.UnitPrice
+		total += subtotal
+
+		pdf.CellFormat(widths[0], 8, item.Product.Name, "1", 0, "L", false, 0, "")
+		pdf.CellFormat(widths[1], 8, fmt.Sprintf("%d", item.Quantity), "1", 0, "C", false, 0, "")
+		pdf.CellFormat(widths[2], 8, fmt.Sprintf("Rp %.2f", item.UnitPrice), "1", 0, "R", false, 0, "")
+		pdf.CellFormat(widths[3], 8, fmt.Sprintf("Rp %.2f", subtotal), "1", 0, "R", false, 0, "")
+		pdf.Ln(-1)
+	}
+
+	pdf.SetFont("Arial", "B", 10)
+	pdf.CellFormat(widths[0]+widths[1]+widths[2], 8, "Total", "1", 0, "R", false, 0, "")
+	pdf.CellFormat(widths[3], 8, fmt.Sprintf("Rp %.2f", total), "1", 0, "R", false, 0, "")
+	pdf.Ln(-1)
+
+	pdf.Ln(10)
 	pdf.SetFont("Arial", "I", 10)
 	pdf.CellFormat(0, 10, "Harap transfer segera ke Rekening BCA 123456", "", 1, "C", false, 0, "")
 
+	// Output — harus paling akhir
 	var buf bytes.Buffer
 	err = pdf.Output(&buf)
 	if err != nil {
@@ -313,7 +351,7 @@ func (s *DealService) GenerateInvoicePDF(dealID string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 func (s *DealService) ExportDealsToPDF() ([]byte, error) {
-	data, _, err := s.deal.GetAllDeals(1, 10, "", "", "")
+	data, _, err := s.deal.GetAllDeals(1, 10, "", "", "", "", "")
 	if err != nil {
 		return nil, err
 	}
@@ -381,6 +419,15 @@ func (s *DealService) UpdateDeal(dealID string, name string, value float64, user
 		NewData:     name,
 	}
 	s.AuditLog.CreateAuditLog(&logData)
+
+	dealHistories, err := s.dealHistoryRepo.GetHistoriesByDealID(dealID)
+	if err != nil {
+		return fmt.Errorf("gagal mendapatkan histori deal: %w", err)
+	}
+	for _, history := range dealHistories {
+		fmt.Println(history)
+	}
+
 	s.redisClient.Del(context.Background(), "crm_dashboard_stats")
 
 	return nil
@@ -433,9 +480,28 @@ func (s *DealService) RemoveProductFromDeal(dealID, productID, userID, role stri
 	return s.dealProductRepo.RemoveProduct(dealID, productID)
 }
 
+func (s *DealService) GetTrashedDeals(userID, role string) ([]entity.Deal, error) {
+	deals, err := s.deal.GetTrashedDeals(userID, role)
+	if err != nil {
+		return nil, err
+	}
+	return deals, nil
+}
+
+func (s *DealService) RestoreDeal(dealID string) error {
+	return s.deal.RestoreDeal(dealID)
+}
+
 func (s *DealService) GetDealProducts(dealID string) ([]entity.DealProduct, error) {
 	if dealID == "" {
 		return nil, errors.New("deal ID wajib diisi")
 	}
 	return s.dealProductRepo.GetProductsByDealID(dealID)
+}
+
+func (s *DealService) GetHistoriesByDealID(dealID string) ([]entity.DealHistory, error) {
+	if dealID == "" {
+		return nil, errors.New("deal ID wajib diisi")
+	}
+	return s.dealHistoryRepo.GetHistoriesByDealID(dealID)
 }

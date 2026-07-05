@@ -2,6 +2,7 @@ package v1
 
 import (
 	"crm-project/internal/service"
+	"crm-project/pkg/response"
 	"net/http"
 	"strconv"
 
@@ -36,7 +37,7 @@ type UpdateContactRequest struct {
 func (h *ContactHandler) CreateContact(c *gin.Context) {
 	var req CreateContactRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 
@@ -52,11 +53,11 @@ func (h *ContactHandler) CreateContact(c *gin.Context) {
 		userID,
 	)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"status": "Contact berhasil dibuat", "data": data})
+	c.JSON(http.StatusCreated, response.Success("Contact berhasil dibuat", data))
 }
 
 func (h *ContactHandler) GetAllContacts(c *gin.Context) {
@@ -67,16 +68,11 @@ func (h *ContactHandler) GetAllContacts(c *gin.Context) {
 
 	data, total, err := h.contactService.GetAllContacts(page, limit, search, source)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"data":  data,
-		"total": total,
-		"page":  page,
-		"limit": limit,
-	})
+	c.JSON(http.StatusOK, response.Paginated(data, total, page, limit))
 }
 
 func (h *ContactHandler) GetContactByID(c *gin.Context) {
@@ -85,14 +81,14 @@ func (h *ContactHandler) GetContactByID(c *gin.Context) {
 	data, err := h.contactService.GetContactByID(id)
 	if err != nil {
 		if err.Error() == "contact tidak ditemukan" {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, response.Error(err.Error()))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": data})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil contact", data))
 }
 
 func (h *ContactHandler) UpdateContact(c *gin.Context) {
@@ -100,7 +96,7 @@ func (h *ContactHandler) UpdateContact(c *gin.Context) {
 
 	var req UpdateContactRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 
@@ -125,25 +121,49 @@ func (h *ContactHandler) UpdateContact(c *gin.Context) {
 	}
 
 	if len(updates) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tidak ada field yang diupdate"})
+		c.JSON(http.StatusBadRequest, response.Error("tidak ada field yang diupdate"))
 		return
 	}
 
 	if err := h.contactService.UpdateContact(id, updates); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "Contact berhasil diupdate"})
+	c.JSON(http.StatusOK, response.Success("Contact berhasil diupdate", nil))
+}
+
+func (h *ContactHandler) GetTrashedContacts(c *gin.Context) {
+	userID := c.GetString("user_id")
+	role := c.GetString("role")
+
+	contacts, err := h.contactService.GetTrashedContacts(userID, role)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil contact yang dihapus", contacts))
+}
+
+func (h *ContactHandler) RestoreContact(c *gin.Context) {
+	id := c.Param("id")
+
+	if err := h.contactService.RestoreContact(id); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Success("Contact berhasil direstore", nil))
 }
 
 func (h *ContactHandler) DeleteContact(c *gin.Context) {
 	id := c.Param("id")
 
 	if err := h.contactService.DeleteContact(id); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "Contact berhasil dihapus"})
+	c.JSON(http.StatusOK, response.Success("Contact berhasil dihapus", nil))
 }

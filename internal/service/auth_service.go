@@ -6,6 +6,9 @@ import (
 	"crm-project/internal/repository/postgres"
 	"crm-project/internal/worker"
 	"crm-project/pkg/jwt"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -99,7 +102,22 @@ func (s *UserService) Login(email string, password string) (token string, userID
 		return "", "", false, fmt.Errorf("failed to create JWT token")
 	}
 
-	return jwtMake, isUser.ID, false, nil
+	rawToken := make([]byte, 32)
+	if _, err := rand.Read(rawToken); err != nil {
+		return "", "", false, fmt.Errorf("failed to generate refresh token")
+	}
+	refreshToken := hex.EncodeToString(rawToken)
+
+	hashBytes := sha256.Sum256([]byte(refreshToken))
+	tokenHash := hex.EncodeToString(hashBytes[:])
+
+	expiry := time.Duration(time.Hour * 24 * 7)
+	ctx := context.Background()
+	if err := s.rdb.Set(ctx, "refresh:"+tokenHash, isUser.ID, expiry).Err(); err != nil {
+		return "", "", false, fmt.Errorf("failed to save refresh token")
+	}
+
+	return jwtMake, refreshToken, false, nil
 }
 
 func (s *UserService) ChangePassword(userID string, oldPassword string, newPassword string) error {
@@ -278,4 +296,19 @@ func (s *UserService) GetProfile(userID string) (*entity.User, error) {
 
 func (s *UserService) GetAllUsers() ([]entity.User, error) {
 	return s.user.GetAllUsers()
+}
+
+func (s *UserService) Logout(userID string, token string) error {
+	claims, err := jwt.ExtractClaims(token)
+	if err != nil {
+		return fmt.Errorf("invalid token: %w", err)
+	}
+	ttl := time.Until(claims.ExpiresAt.Time)
+	if ttl <= 0 {
+		return nil
+	}
+
+	hash := sha256.Sum256([]byte(token))
+	redisKey := "blacklist:" + hex.EncodeToString(hash[:])
+	return s.rdb.Set(context.Background(), redisKey, "1", ttl).Err()
 }

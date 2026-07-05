@@ -2,6 +2,7 @@ package v1
 
 import (
 	"crm-project/internal/service"
+	"crm-project/pkg/response"
 	"net/http"
 	"strconv"
 	"time"
@@ -41,81 +42,76 @@ type ScheduleCampaignRequest struct {
 func (h *CampaignHandler) CreateCampaign(c *gin.Context) {
 	var req CreateCampaignRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
-	userID := c.GetString("userID")
+	userID := c.MustGet("user_id").(string)
 	campaign, err := h.campaignService.CreateCampaign(req.Name, req.Subject, req.Body, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"message": "Campaign created", "data": campaign})
+	c.JSON(http.StatusCreated, response.Success("Campaign berhasil dibuat", campaign))
 }
 
 func (h *CampaignHandler) GetAllCampaigns(c *gin.Context) {
-	status := c.Query("status")
-	campaigns, err := h.campaignService.GetAllCampaigns(status)
+	campaigns, err := h.campaignService.GetAllCampaigns(c.Query("status"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Campaigns retrieved", "data": campaigns})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil daftar campaign", campaigns))
 }
 
 func (h *CampaignHandler) GetCampaignByID(c *gin.Context) {
-	id := c.Param("id")
-	campaign, err := h.campaignService.GetCampaignByID(id)
+	campaign, err := h.campaignService.GetCampaignByID(c.Param("id"))
 	if err != nil {
 		if err.Error() == "campaign not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, response.Error(err.Error()))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Campaign retrieved", "data": campaign})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil campaign", campaign))
 }
 
 func (h *CampaignHandler) UpdateCampaign(c *gin.Context) {
 	id := c.Param("id")
 	var req UpdateCampaignRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
-	userID := c.GetString("userID")
+	userID := c.MustGet("user_id").(string)
 	if err := h.campaignService.UpdateCampaign(id, userID, req.Name, req.Subject, req.Body); err != nil {
 		if err.Error() == "campaign not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, response.Error(err.Error()))
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Campaign updated"})
+	c.JSON(http.StatusOK, response.Success("Campaign berhasil diupdate", nil))
 }
 
 func (h *CampaignHandler) DeleteCampaign(c *gin.Context) {
-	id := c.Param("id")
-	if err := h.campaignService.DeleteCampaign(id); err != nil {
+	if err := h.campaignService.DeleteCampaign(c.Param("id")); err != nil {
 		if err.Error() == "campaign not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, response.Error(err.Error()))
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Campaign deleted"})
+	c.JSON(http.StatusOK, response.Success("Campaign berhasil dihapus", nil))
 }
 
 func (h *CampaignHandler) AddRecipients(c *gin.Context) {
 	id := c.Param("id")
 	var req AddRecipientsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 
@@ -125,68 +121,63 @@ func (h *CampaignHandler) AddRecipients(c *gin.Context) {
 	} else {
 		err = h.campaignService.AddRecipientsByContactIDs(id, req.IDs)
 	}
-
 	if err != nil {
 		if err.Error() == "campaign not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, response.Error(err.Error()))
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Recipients added"})
+	c.JSON(http.StatusOK, response.Success("Penerima berhasil ditambahkan", nil))
 }
 
 func (h *CampaignHandler) SendCampaign(c *gin.Context) {
-	id := c.Param("id")
-	if err := h.campaignService.SendCampaign(id); err != nil {
+	if err := h.campaignService.SendCampaign(c.Param("id")); err != nil {
 		if err.Error() == "campaign not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, response.Error(err.Error()))
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Campaign is now sending"})
+	c.JSON(http.StatusOK, response.Success("Campaign sedang dikirim", nil))
 }
 
 func (h *CampaignHandler) ScheduleCampaign(c *gin.Context) {
 	id := c.Param("id")
 	var req ScheduleCampaignRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
 	scheduledAt, err := time.Parse(time.RFC3339, req.ScheduledAt)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid scheduled_at format, use RFC3339 (e.g. 2006-01-02T15:04:05Z)"})
+		c.JSON(http.StatusBadRequest, response.Error("Format scheduled_at tidak valid, gunakan RFC3339 (contoh: 2006-01-02T15:04:05Z)"))
 		return
 	}
-
 	if err := h.campaignService.ScheduleCampaign(id, scheduledAt); err != nil {
 		if err.Error() == "campaign not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, response.Error(err.Error()))
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Campaign scheduled"})
+	c.JSON(http.StatusOK, response.Success("Campaign berhasil dijadwalkan", nil))
 }
 
 func (h *CampaignHandler) GetCampaignStats(c *gin.Context) {
-	id := c.Param("id")
-	stats, err := h.campaignService.GetCampaignStats(id)
+	stats, err := h.campaignService.GetCampaignStats(c.Param("id"))
 	if err != nil {
 		if err.Error() == "campaign not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, response.Error(err.Error()))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Campaign stats retrieved", "data": stats})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil statistik campaign", stats))
 }
 
 func (h *CampaignHandler) GetRecipients(c *gin.Context) {
@@ -203,17 +194,11 @@ func (h *CampaignHandler) GetRecipients(c *gin.Context) {
 	recipients, total, err := h.campaignService.GetRecipients(id, page, limit)
 	if err != nil {
 		if err.Error() == "campaign not found" {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, response.Error(err.Error()))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Recipients retrieved",
-		"data":    recipients,
-		"total":   total,
-		"page":    page,
-		"limit":   limit,
-	})
+	c.JSON(http.StatusOK, response.Paginated(recipients, total, page, limit))
 }

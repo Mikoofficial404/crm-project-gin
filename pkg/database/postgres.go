@@ -28,10 +28,18 @@ func DBConn() *gorm.DB {
 }
 
 func MigrateDB() error {
+
 	err := DB.AutoMigrate(
+		&entity.Team{},
 		&entity.Pipeline{},
 		&entity.PipelineStage{},
 		&entity.User{},
+	)
+	if err != nil {
+		return err
+	}
+
+	err = DB.AutoMigrate(
 		&entity.Contact{},
 		&entity.Lead{},
 		&entity.Deal{},
@@ -39,16 +47,25 @@ func MigrateDB() error {
 		&entity.Notification{},
 		&entity.AuditLog{},
 		&entity.Product{},
-		&entity.Invoice{},
-		&entity.InvoiceItem{},
-		&entity.DealProduct{},
 		&entity.Task{},
 		&entity.Campaign{},
-		&entity.CampaignRecipient{},
 	)
 	if err != nil {
 		return err
 	}
+
+	err = DB.AutoMigrate(
+		&entity.Invoice{},
+		&entity.InvoiceItem{},
+		&entity.DealProduct{},
+		&entity.CampaignRecipient{},
+		&entity.DealComment{},
+		&entity.DealHistory{},
+	)
+	if err != nil {
+		return err
+	}
+
 	logrus.Info("Migrasi database berhasil!")
 	return nil
 }

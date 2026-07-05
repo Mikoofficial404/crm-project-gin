@@ -2,6 +2,7 @@ package v1
 
 import (
 	"crm-project/internal/service"
+	"crm-project/pkg/response"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -22,14 +23,11 @@ func (h *NotificationHandler) GetMyNotifications(c *gin.Context) {
 
 	notifications, err := h.notificationService.GetUnreadByUserID(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil notifikasi"})
+		c.JSON(http.StatusInternalServerError, response.Error("Gagal mengambil notifikasi"))
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status": "success",
-		"data":   notifications,
-	})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil notifikasi", notifications))
 }
 
 func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
@@ -38,14 +36,11 @@ func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
 
 	err := h.notificationService.MarkAsRead(userID, notifID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Notifikasi berhasil ditandai sudah dibaca",
-	})
+	c.JSON(http.StatusOK, response.Success("Notifikasi berhasil ditandai sudah dibaca", nil))
 }
 
 func (h *NotificationHandler) MarkAllAsRead(c *gin.Context) {
@@ -53,12 +48,9 @@ func (h *NotificationHandler) MarkAllAsRead(c *gin.Context) {
 
 	err := h.notificationService.MarkAllAsRead(userID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Semua notifikasi berhasil dibersihkan",
-	})
+	c.JSON(http.StatusOK, response.Success("Semua notifikasi berhasil dibersihkan", nil))
 }

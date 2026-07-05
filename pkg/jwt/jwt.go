@@ -110,3 +110,13 @@ func MakeRefreshToken() (string, error) {
 	encode := hex.EncodeToString(s)
 	return encode, nil
 }
+
+func ExtractClaims(tokenString string) (*MyCustomClaims, error) {
+	claims := &MyCustomClaims{}
+	parser := jwt.NewParser()
+	_, _, err := parser.ParseUnverified(tokenString, claims)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse token: %w", err)
+	}
+	return claims, nil
+}

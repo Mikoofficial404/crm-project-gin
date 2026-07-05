@@ -3,6 +3,8 @@ package middleware
 import (
 	"context"
 	"crm-project/pkg/jwt"
+	"crypto/sha256"
+	"encoding/hex"
 	"net/http"
 	"os"
 
@@ -22,19 +24,20 @@ func AuthMiddleware(rdb *redis.Client) gin.HandlerFunc {
 		}
 
 		ctx := context.Background()
-		_, redisErr := rdb.Get(ctx, "blacklist:"+jwtBearer).Result()
-		if redisErr == nil {
-
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Token sudah tidak berlaku (logout)"})
-			return
-		}
-
 		secret := os.Getenv("JWT_SECRET")
 		validateJwt, role, err := jwt.ValidateJWT(jwtBearer, secret)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Token tidak valid"})
 			return
 		}
+
+		hash := sha256.Sum256([]byte(jwtBearer))
+		redisKey := "blacklist:" + hex.EncodeToString(hash[:])
+		if _, redisErr := rdb.Get(ctx, redisKey).Result(); redisErr == nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: Token sudah tidak berlaku (logout)"})
+			return
+		}
+
 		c.Set("user_id", validateJwt.String())
 		c.Set("role", role)
 		c.Set("token", jwtBearer)

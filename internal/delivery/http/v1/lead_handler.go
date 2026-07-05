@@ -4,12 +4,13 @@ import (
 	"crm-project/internal/models/entity"
 	"crm-project/internal/repository/postgres"
 	"crm-project/internal/service"
+	"crm-project/pkg/response"
 	"encoding/csv"
-	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 type LeadHandler struct {
@@ -52,16 +53,16 @@ type UpdateLeadRequest struct {
 func (h *LeadHandler) CreateLeader(c *gin.Context) {
 	var req CreateLeadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 	userID := c.MustGet("user_id").(string)
 	data, err := h.leadService.CreateLead(req.Name, req.Email, req.Phone, userID, req.CustomFields)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"status": "Lead Created", "data": data})
+	c.JSON(http.StatusCreated, response.Success("Lead berhasil dibuat", data))
 }
 
 func (h *LeadHandler) GetTrashedLeads(c *gin.Context) {
@@ -69,30 +70,22 @@ func (h *LeadHandler) GetTrashedLeads(c *gin.Context) {
 	role := c.MustGet("role").(string)
 	data, err := h.leadService.GetTrashedLeads(userID, role)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"data": data,
-	})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil lead yang dihapus", data))
 }
+
 func (h *LeadHandler) RestoreLead(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.MustGet("user_id").(string)
 
 	err := h.leadService.RestoreLead(id, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
-		})
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Lead restored successfully",
-	})
+	c.JSON(http.StatusOK, response.Success("Lead berhasil direstore", nil))
 }
 
 func (h *LeadHandler) GetLeads(c *gin.Context) {
@@ -112,37 +105,26 @@ func (h *LeadHandler) GetLeads(c *gin.Context) {
 
 	data, total, err := h.leadService.GetLeads(userId, role, page, limit, search, status)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"status": "Get Leads",
-		"data":   data,
-		"meta": gin.H{
-			"page":  page,
-			"limit": limit,
-			"total": total,
-		},
-	})
+	c.JSON(http.StatusOK, response.Paginated(data, total, page, limit))
 }
 
 func (h *LeadHandler) GetLeadByID(c *gin.Context) {
 	leadID := c.Param("id")
 	if leadID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID lead tidak boleh kosong"})
+		c.JSON(http.StatusBadRequest, response.Error("ID lead tidak boleh kosong"))
 		return
 	}
 
 	data, err := h.leadService.GetLeadByID(leadID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Lead tidak ditemukan"})
+		c.JSON(http.StatusNotFound, response.Error("Lead tidak ditemukan"))
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"status": "Get Lead",
-		"data":   data,
-	})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil lead", data))
 }
 
 func (h *LeadHandler) UpdateStatusLeads(c *gin.Context) {
@@ -151,29 +133,27 @@ func (h *LeadHandler) UpdateStatusLeads(c *gin.Context) {
 		Status string `json:"status"`
 	}
 	if catchId == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "ID prospek tidak boleh kosong",
-		})
+		c.JSON(http.StatusBadRequest, response.Error("ID prospek tidak boleh kosong"))
 		return
 	}
 	if err := c.ShouldBindJSON(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 	userId := c.MustGet("user_id").(string)
 	role := c.MustGet("role").(string)
 	err := h.leadService.UpdateLeadStatus(catchId, request.Status, userId, role)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusAccepted, gin.H{"status": "update status Leads", "data": gin.H{"id": catchId, "status": request.Status}})
+	c.JSON(http.StatusAccepted, response.Success("Status lead berhasil diupdate", gin.H{"id": catchId, "status": request.Status}))
 }
 
 func (h *LeadHandler) DeleteLead(c *gin.Context) {
 	leadID := c.Param("id")
 	if leadID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID lead tidak boleh kosong"})
+		c.JSON(http.StatusBadRequest, response.Error("ID lead tidak boleh kosong"))
 		return
 	}
 
@@ -182,63 +162,63 @@ func (h *LeadHandler) DeleteLead(c *gin.Context) {
 
 	err := h.leadService.DeleteLead(leadID, userID, role)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "Lead berhasil dihapus", "data": gin.H{"id": leadID}})
+	c.JSON(http.StatusOK, response.Success("Lead berhasil dihapus", gin.H{"id": leadID}))
 }
 
 func (h *LeadHandler) ReplyWhatsApp(c *gin.Context) {
 	idMessage := c.Param("id")
 	if idMessage == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID lead tidak boleh kosong"})
+		c.JSON(http.StatusBadRequest, response.Error("ID lead tidak boleh kosong"))
 		return
 	}
 	var req SendReplyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 
 	idSales, exists := c.Get("user_id")
-	idSalesStr := idSales.(string)
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		c.JSON(http.StatusUnauthorized, response.Error("unauthorized"))
 		return
 	}
+	idSalesStr := idSales.(string)
+
 	lead, err := h.leadRepository.GetLeadByID(idMessage)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "lead not found"})
+		c.JSON(http.StatusNotFound, response.Error("Lead tidak ditemukan"))
 		return
 	}
 	clientHandphone := lead.Phone
 	go func() {
-		err := h.waService.SendWA(clientHandphone, req.Message)
-		if err != nil {
-			log.Println("failed to send message:", err)
+		if err := h.waService.SendWA(clientHandphone, req.Message); err != nil {
+			logrus.WithError(err).Warn("Gagal kirim pesan WhatsApp")
 		}
 	}()
-	activites, err := h.activtyService.CreateActivity("WhatsApp Reply", req.Message, lead.ID, idSalesStr, "")
-	c.JSON(http.StatusOK, gin.H{"status: ": "Pesan Wa terima", "Aktifitas": activites})
+	activity, _ := h.activtyService.CreateActivity("WhatsApp Reply", req.Message, lead.ID, idSalesStr, "")
+	c.JSON(http.StatusOK, response.Success("Pesan WhatsApp terkirim", activity))
 }
 
 func (h *LeadHandler) ImportCSV(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 	src, err := file.Open()
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 	defer src.Close()
 	reader := csv.NewReader(src)
 	records, err := reader.ReadAll()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
 	var daftarBaru []entity.Lead
@@ -257,22 +237,53 @@ func (h *LeadHandler) ImportCSV(c *gin.Context) {
 	}
 	err = h.leadService.ImportBulkLeads(daftarBaru)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan ratusan data"})
+		c.JSON(http.StatusInternalServerError, response.Error("Gagal menyimpan data lead"))
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"status": "Sukses Import Ratusan Lead!"})
+	c.JSON(http.StatusCreated, response.Success("Sukses import lead dari CSV", gin.H{"total": len(daftarBaru)}))
+}
+
+func (h *LeadHandler) GetAgingLeads(c *gin.Context) {
+	days := 7
+	if c.Query("days") != "" {
+		days, _ = strconv.Atoi(c.Query("days"))
+	}
+	userID := c.MustGet("user_id").(string)
+	role := c.MustGet("role").(string)
+	leads, err := h.leadService.GetAgingLeads(userID, role, days)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, response.Success("Daftar lead yang menderita kemarin", leads))
+}
+
+func (h *LeadHandler) GetLeadTimeline(c *gin.Context) {
+	leadID := c.Param("id")
+	if leadID == "" {
+		c.JSON(http.StatusBadRequest, response.Error("ID lead tidak boleh kosong"))
+		return
+	}
+	userID := c.MustGet("user_id").(string)
+	role := c.MustGet("role").(string)
+	timelines, err := h.leadService.GetLeadTimeline(leadID, userID, role)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, response.Success("Timeline lead", timelines))
 }
 
 func (h *LeadHandler) UpdateLead(c *gin.Context) {
 	leadID := c.Param("id")
 	if leadID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ID lead tidak boleh kosong"})
+		c.JSON(http.StatusBadRequest, response.Error("ID lead tidak boleh kosong"))
 		return
 	}
 
 	var req UpdateLeadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 
@@ -281,9 +292,9 @@ func (h *LeadHandler) UpdateLead(c *gin.Context) {
 
 	err := h.leadService.UpdateLead(leadID, req.Name, req.Email, req.Phone, userID, role)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "Update Lead berhasil", "data": gin.H{"id": leadID, "name": req.Name, "email": req.Email, "phone": req.Phone}})
+	c.JSON(http.StatusOK, response.Success("Update lead berhasil", gin.H{"id": leadID, "name": req.Name, "email": req.Email, "phone": req.Phone}))
 }

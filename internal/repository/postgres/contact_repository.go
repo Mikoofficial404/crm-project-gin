@@ -42,7 +42,7 @@ func (r *ContactRepository) FindAll(page int, limit int, search string, source s
 
 	baseQuery := r.dbgorm.Model(&entity.Contact{})
 	if search != "" {
-		baseQuery = baseQuery.Where("name ILIKE ? OR phone ILIKE ?", "%"+search+"%", "%"+search+"%")
+		baseQuery = baseQuery.Where("to_tsvector('simple', coalesce(name,'') || ' ' || coalesce(phone,'') || ' ' || coalesce(email,'')) @@ plainto_tsquery('simple', ?)", search)
 	}
 	if source != "" {
 		baseQuery = baseQuery.Where("source = ?", source)
@@ -69,8 +69,7 @@ func (r *ContactRepository) SearchContacts(keyword string) ([]entity.Contact, er
 	var contacts []entity.Contact
 	err := r.dbgorm.
 		Preload("AssignedUser").
-		Where("name ILIKE ? OR phone ILIKE ? OR email ILIKE ?",
-			"%"+keyword+"%", "%"+keyword+"%", "%"+keyword+"%").
+		Where("to_tsvector('simple', coalesce(name,'') || ' ' || coalesce(phone,'') || ' ' || coalesce(email,'')) @@ plainto_tsquery('simple', ?)", keyword).
 		Find(&contacts).Error
 	if err != nil {
 		return nil, err
@@ -102,4 +101,21 @@ func (r *ContactRepository) FindByEmail(email string) (*entity.Contact, error) {
 		return nil, err
 	}
 	return &contact, nil
+}
+
+func (r *ContactRepository) GetTrashedContacts(userID, role string) ([]entity.Contact, error) {
+	var contacts []entity.Contact
+	query := r.dbgorm.Unscoped().Where("deleted_at IS NOT NULL")
+	if role == "sales" {
+		query = query.Where("assigned_to = ?", userID)
+	}
+	err := query.Find(&contacts).Error
+	if err != nil {
+		return nil, err
+	}
+	return contacts, nil
+}
+
+func (r *ContactRepository) RestoreContact(contactID string) error {
+	return r.dbgorm.Unscoped().Where("id = ?", contactID).Update("deleted_at", nil).Error
 }

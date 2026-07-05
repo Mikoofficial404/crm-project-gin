@@ -2,6 +2,7 @@ package v1
 
 import (
 	"crm-project/internal/service"
+	"crm-project/pkg/response"
 	"net/http"
 	"strconv"
 
@@ -34,87 +35,72 @@ type UpdateProductRequest struct {
 func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	var req CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
 	product, err := h.productService.CreateProduct(req.Name, req.Description, req.Unit, req.Price)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
-	c.JSON(http.StatusCreated, gin.H{"message": "Produk berhasil dibuat", "data": product})
+	c.JSON(http.StatusCreated, response.Success("Produk berhasil dibuat", product))
 }
 
 func (h *ProductHandler) GetAllProducts(c *gin.Context) {
 	onlyActive := true
 	if activeStr := c.Query("active"); activeStr != "" {
-		parsed, err := strconv.ParseBool(activeStr)
-		if err == nil {
+		if parsed, err := strconv.ParseBool(activeStr); err == nil {
 			onlyActive = parsed
 		}
 	}
-
 	products, err := h.productService.GetAllProducts(onlyActive)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Berhasil mengambil daftar produk", "data": products})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil daftar produk", products))
 }
 
 func (h *ProductHandler) GetProductByID(c *gin.Context) {
-	productID := c.Param("id")
-
-	product, err := h.productService.GetProductByID(productID)
+	product, err := h.productService.GetProductByID(c.Param("id"))
 	if err != nil {
 		if err.Error() == "produk tidak ditemukan" {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, response.Error(err.Error()))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Berhasil mengambil produk", "data": product})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil produk", product))
 }
 
 func (h *ProductHandler) UpdateProduct(c *gin.Context) {
-	productID := c.Param("id")
-
 	var req UpdateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
-	err := h.productService.UpdateProduct(productID, req.Name, req.Description, req.Unit, req.Price, req.IsActive)
+	err := h.productService.UpdateProduct(c.Param("id"), req.Name, req.Description, req.Unit, req.Price, req.IsActive)
 	if err != nil {
 		if err.Error() == "produk tidak ditemukan" {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, response.Error(err.Error()))
 			return
 		}
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Produk berhasil diupdate"})
+	c.JSON(http.StatusOK, response.Success("Produk berhasil diupdate", nil))
 }
 
 func (h *ProductHandler) DeleteProduct(c *gin.Context) {
-	productID := c.Param("id")
-
-	err := h.productService.DeleteProduct(productID)
+	err := h.productService.DeleteProduct(c.Param("id"))
 	if err != nil {
 		if err.Error() == "produk tidak ditemukan" {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, response.Error(err.Error()))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Produk berhasil dihapus"})
+	c.JSON(http.StatusOK, response.Success("Produk berhasil dihapus", nil))
 }

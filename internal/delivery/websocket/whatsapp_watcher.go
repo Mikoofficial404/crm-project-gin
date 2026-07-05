@@ -4,26 +4,26 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/sirupsen/logrus"
 )
 
 func StartGowaWatcher() {
 	for {
 		err := connectAndListen()
 		if err != nil {
-			log.Printf("[GowaWatcher] Disconnected: %v — reconnecting in 5s...\n", err)
+			logrus.WithError(err).Warn("[GowaWatcher] Disconnected, reconnecting in 5s...")
 			time.Sleep(5 * time.Second)
 		}
 	}
 }
 
 func connectAndListen() error {
-	log.Println("[GowaWatcher] Connecting to Gowa WebSocket...")
+	logrus.Info("[GowaWatcher] Connecting to Gowa WebSocket...")
 
 	wsURL := fmt.Sprintf("wss://%s/ws?device_id=%s", os.Getenv("WA_GOWA_URL")[8:], os.Getenv("WA_DEVICE_ID"))
 	credentials := base64.StdEncoding.EncodeToString([]byte(os.Getenv("WA_BASIC_AUTH")))
@@ -36,7 +36,7 @@ func connectAndListen() error {
 	}
 	defer conn.Close()
 
-	log.Println("[GowaWatcher]Connected! Listening for WhatsApp messages...")
+	logrus.Info("[GowaWatcher] Connected! Listening for WhatsApp messages...")
 
 	for {
 		messageType, payload, err := conn.ReadMessage()
@@ -46,17 +46,17 @@ func connectAndListen() error {
 
 		switch messageType {
 		case websocket.TextMessage:
-			fmt.Printf("[GowaWatcher]Text Message: %s\n", string(payload))
+			logrus.WithField("payload", string(payload)).Debug("[GowaWatcher] Text Message received")
 			go func(data []byte) {
 				_, err := http.Post("http://localhost:8080/api/v1/webhook/whatsapp", "application/json", bytes.NewBuffer(data))
 				if err != nil {
-					log.Printf("[GowaWatcher] Error forwarding to webhook: %v\n", err)
+					logrus.WithError(err).Error("[GowaWatcher] Error forwarding to webhook")
 				}
 			}(payload)
 		case websocket.BinaryMessage:
-			fmt.Printf("[GowaWatcher]Binary Message (%d bytes)\n", len(payload))
+			logrus.WithField("bytes", len(payload)).Debug("[GowaWatcher] Binary Message received")
 		default:
-			fmt.Printf("[GowaWatcher]Unknown message type %d\n", messageType)
+			logrus.WithField("type", messageType).Warn("[GowaWatcher] Unknown message type")
 		}
 	}
 }

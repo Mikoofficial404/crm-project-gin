@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/redis/go-redis/v9"
 )
@@ -22,9 +23,10 @@ type LeadService struct {
 	AuditLog    *postgres.AuditRepository
 	AsynqClient *asynq.Client
 	redisClient *redis.Client
+	notifRepo   *postgres.NotificationRepository
 }
 
-func NewLeadService(leadRepo *postgres.LeadRepository, userRepo *postgres.UserRepository, asyncClient *asynq.Client, redisClient *redis.Client, AuditLog *postgres.AuditRepository, contactRepo *postgres.ContactRepository) *LeadService {
+func NewLeadService(leadRepo *postgres.LeadRepository, userRepo *postgres.UserRepository, asyncClient *asynq.Client, redisClient *redis.Client, AuditLog *postgres.AuditRepository, contactRepo *postgres.ContactRepository, notifRepo *postgres.NotificationRepository) *LeadService {
 	return &LeadService{
 		lead:        leadRepo,
 		user:        userRepo,
@@ -32,6 +34,7 @@ func NewLeadService(leadRepo *postgres.LeadRepository, userRepo *postgres.UserRe
 		AsynqClient: asyncClient,
 		redisClient: redisClient,
 		AuditLog:    AuditLog,
+		notifRepo:   notifRepo,
 	}
 }
 
@@ -44,6 +47,29 @@ func (s *LeadService) CreateLead(name string, email string, phone string, userID
 		}
 	}
 	return s.CreateLeadWithContact(name, email, phone, userID, customFields, contactID)
+}
+
+func (s *LeadService) GetLeadTimeline(leadID, userID, role string) (*[]postgres.TimelineItem, error) {
+	if role != "admin" && role != "sales" {
+		return nil, errors.New("unauthorized")
+	}
+
+	if role == "sales" {
+		lead, err := s.lead.GetLeadByID(leadID)
+		if err != nil {
+			return nil, errors.New("lead tidak ditemukan")
+		}
+		if lead.AssignedTo != userID {
+			return nil, errors.New("unauthorized")
+		}
+	}
+
+	timeLines, err := s.lead.GetLeadTimeline(leadID)
+	if err != nil {
+		return nil, err
+	}
+
+	return timeLines, nil
 }
 
 func (s *LeadService) CreateLeadWithContact(name string, email string, phone string, userID string, customFields map[string]interface{}, contactID *string) (*entity.Lead, error) {
@@ -216,9 +242,30 @@ func (s *LeadService) UpdateLead(leadID string, name string, email string, phone
 	if err != nil {
 		return err
 	}
+	newLead, err := s.lead.GetLeadByID(leadID)
+	if err != nil {
+		return err
+	}
+
+	if oldLead.AssignedTo != newLead.AssignedTo {
+		assignedToUUID, err := uuid.Parse(newLead.AssignedTo)
+		if err != nil {
+			return fmt.Errorf("invalid assigned_to UUID: %w", err)
+		}
+
+		notif := &entity.Notification{
+			UserID:  assignedToUUID,
+			Title:   "Lead Baru Di-assign ke Kamu",
+			Message: fmt.Sprintf("Lead '%s' telah ditugaskan kepada Anda", newLead.Name),
+		}
+		s.notifRepo.CreateNotification(notif)
+
+		wsMsg := fmt.Sprintf(`{"type":"lead_assigned","title":"Lead Baru Di-assign ke Kamu","message":"Lead '%s' telah ditugaskan kepada Anda"}`, newLead.Name)
+		websocket.SendMessageToUser(newLead.AssignedTo, wsMsg)
+	}
 
 	s.redisClient.Del(context.Background(), "crm_dashboard_stats")
-	newLead, err := s.lead.GetLeadByID(leadID)
+	updatedLead, err := s.lead.GetLeadByID(leadID)
 	if err != nil {
 		return nil
 	}
@@ -226,7 +273,7 @@ func (s *LeadService) UpdateLead(leadID string, name string, email string, phone
 	if err != nil {
 		return nil
 	}
-	newDataJSON, err := json.Marshal(newLead)
+	newDataJSON, err := json.Marshal(updatedLead)
 	if err != nil {
 		return nil
 	}
@@ -287,4 +334,16 @@ func (s *LeadService) RestoreLead(leadID string, userID string) error {
 
 	s.AuditLog.CreateAuditLog(&logData)
 	return nil
+}
+
+func (s *LeadService) GetAgingLeads(userID, role string, days int) ([]entity.Lead, error) {
+	leads, err := s.lead.GetAgingLeads(userID, role, days)
+	if err != nil {
+		return nil, err
+	}
+	if days == 0 {
+		days = 7
+	}
+	s.CheckStaleLeads()
+	return leads, nil
 }

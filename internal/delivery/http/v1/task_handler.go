@@ -2,6 +2,7 @@ package v1
 
 import (
 	"crm-project/internal/service"
+	"crm-project/pkg/response"
 	"net/http"
 	"time"
 
@@ -36,7 +37,7 @@ type UpdateTaskRequest struct {
 func (h *TaskHandler) CreateTask(c *gin.Context) {
 	var req CreateTaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 	userID := c.MustGet("user_id").(string)
@@ -52,10 +53,10 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 
 	data, err := h.taskService.CreateTask(req.Title, req.Description, req.DueDate, userID, req.LeadID, priority, category)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"status": "Task berhasil dibuat", "data": data})
+	c.JSON(http.StatusCreated, response.Success("Task berhasil dibuat", data))
 }
 
 func (h *TaskHandler) GetAllTasks(c *gin.Context) {
@@ -65,27 +66,27 @@ func (h *TaskHandler) GetAllTasks(c *gin.Context) {
 	category := c.Query("category")
 	data, err := h.taskService.GetAllTasks(userID, role, priority, category)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": data})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil tasks", data))
 }
 
 func (h *TaskHandler) GetTaskByID(c *gin.Context) {
 	taskID := c.Param("id")
 	data, err := h.taskService.GetTaskByID(taskID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Task tidak ditemukan"})
+		c.JSON(http.StatusNotFound, response.Error("Task tidak ditemukan"))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": data})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil task", data))
 }
 
 func (h *TaskHandler) UpdateTask(c *gin.Context) {
 	taskID := c.Param("id")
 	var req UpdateTaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 	userID := c.MustGet("user_id").(string)
@@ -102,10 +103,28 @@ func (h *TaskHandler) UpdateTask(c *gin.Context) {
 
 	err := h.taskService.UpdateTask(taskID, req.Title, req.Description, req.DueDate, priority, category, userID, role)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "Task berhasil diupdate"})
+	c.JSON(http.StatusOK, response.Success("Task berhasil diupdate", nil))
+}
+
+func (h *TaskHandler) GetTrashedTasks(c *gin.Context) {
+	tasks, err := h.taskService.GetTrashedTasks()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil tasks yang dihapus", tasks))
+}
+
+func (h *TaskHandler) RestoreTask(c *gin.Context) {
+	taskID := c.Param("id")
+	if err := h.taskService.RestoreTask(taskID); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, response.Success("Berhasil mengembalikan task", nil))
 }
 
 func (h *TaskHandler) DeleteTask(c *gin.Context) {
@@ -114,10 +133,10 @@ func (h *TaskHandler) DeleteTask(c *gin.Context) {
 	role := c.MustGet("role").(string)
 	err := h.taskService.DeleteTask(taskID, userID, role)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "Task berhasil dihapus"})
+	c.JSON(http.StatusOK, response.Success("Task berhasil dihapus", nil))
 }
 
 func (h *TaskHandler) MarkAsDone(c *gin.Context) {
@@ -126,8 +145,8 @@ func (h *TaskHandler) MarkAsDone(c *gin.Context) {
 	role := c.MustGet("role").(string)
 	err := h.taskService.MarkAsDone(taskID, userID, role)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "Task berhasil ditandai selesai"})
+	c.JSON(http.StatusOK, response.Success("Task berhasil ditandai selesai", nil))
 }

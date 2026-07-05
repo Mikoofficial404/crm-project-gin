@@ -119,6 +119,17 @@ func (s *TaskService) MarkAsDone(taskID string, userID string, role string) erro
 	return s.task.MarkAsDone(taskID)
 }
 
+func (s *TaskService) GetTrashedTasks() ([]entity.Task, error) {
+	return s.task.GetTrashedTasks()
+}
+
+func (s *TaskService) RestoreTask(taskID string) error {
+	if taskID == "" {
+		return errors.New("ID task wajib diisi")
+	}
+	return s.task.RestoreTask(taskID)
+}
+
 func (s *TaskService) SendDueDateReminders() error {
 	task, err := s.task.GetTasksDueTomorrow()
 	if err != nil {

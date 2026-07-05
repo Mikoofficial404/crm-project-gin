@@ -1,24 +1,21 @@
 package v1
 
 import (
-	"context"
 	"crm-project/internal/service"
+	"crm-project/pkg/jwt"
+	"crm-project/pkg/response"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 )
 
 type UserHandler struct {
 	userService *service.UserService
-	redisClient *redis.Client
 }
 
-func NewUserHandler(userService *service.UserService, redisClient *redis.Client) *UserHandler {
+func NewUserHandler(userService *service.UserService) *UserHandler {
 	return &UserHandler{
 		userService: userService,
-		redisClient: redisClient,
 	}
 }
 
@@ -49,54 +46,52 @@ type ResetPasswordRequest struct {
 
 func (h *UserHandler) Register(c *gin.Context) {
 	var req RegisterRequest
-
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
 	data, err := h.userService.Register(req.Email, req.Name, req.Password)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"status": "registration successful", "data": data})
+	c.JSON(http.StatusCreated, response.Success("Registrasi berhasil", data))
 }
 
 func (h *UserHandler) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
 	token, userID, requires2FA, err := h.userService.Login(req.Email, req.Password)
-
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 	if requires2FA {
 		c.JSON(http.StatusAccepted, gin.H{
+			"success": false,
 			"message": "OTP Diperlukan! Silakan verifikasi.",
-			"user_id": userID,
+			"data":    gin.H{"user_id": userID},
 		})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "login sukses", "token": token})
+	c.JSON(http.StatusOK, response.Success("Login berhasil", gin.H{"token": token}))
 }
 
 func (h *UserHandler) Logout(c *gin.Context) {
-	token := c.MustGet("token").(string)
-	ctx := context.Background()
-
-	err := h.redisClient.Set(ctx, "blacklist:"+token, "true", 24*time.Hour).Err()
+	token, err := jwt.GetBearerToken(c.Request.Header)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal logout"})
+		c.JSON(http.StatusUnauthorized, response.Error("Unauthorized: Token tidak valid"))
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"status": "Logout berhasil"})
+	userID := c.MustGet("user_id").(string)
+	if err := h.userService.Logout(userID, token); err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Gagal logout"))
+		return
+	}
+	c.JSON(http.StatusOK, response.Success("Logout berhasil", nil))
 }
 
 type ChangePasswordRequest struct {
@@ -107,76 +102,65 @@ type ChangePasswordRequest struct {
 func (h *UserHandler) ChangePassword(c *gin.Context) {
 	var req ChangePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
 	userID := c.MustGet("user_id").(string)
-
-	err := h.userService.ChangePassword(userID, req.OldPassword, req.NewPassword)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := h.userService.ChangePassword(userID, req.OldPassword, req.NewPassword); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"status": "Password berhasil diubah"})
+	c.JSON(http.StatusOK, response.Success("Password berhasil diubah", nil))
 }
 
 func (h *UserHandler) ForgotPassword(c *gin.Context) {
 	var req ForgetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-
-	err := h.userService.ForgotPassword(req.Email)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := h.userService.ForgotPassword(req.Email); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "Email reset password telah dikirim"})
+	c.JSON(http.StatusOK, response.Success("Email reset password telah dikirim", nil))
 }
 
 func (h *UserHandler) ResetPassword(c *gin.Context) {
 	var req ResetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	err := h.userService.ResetPassword(req.Token, req.NewPassword)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := h.userService.ResetPassword(req.Token, req.NewPassword); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "Reset Password berhasil "})
-
+	c.JSON(http.StatusOK, response.Success("Reset password berhasil", nil))
 }
 
 func (h *UserHandler) VerifyOTP(c *gin.Context) {
 	var req VerifyOTPRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 	data, err := h.userService.VerifyOTP(req.UserID, req.OTPCode)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"status": "Verifikasi OTP Sukses!",
-		"token":  data,
-	})
+	c.JSON(http.StatusOK, response.Success("Verifikasi OTP berhasil", gin.H{"token": data}))
 }
 
 func (h *UserHandler) Setup2FA(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
 	data, err := h.userService.SetUp2FA(userID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "SetUp2FA", "data": data})
+	c.JSON(http.StatusOK, response.Success("Setup 2FA berhasil", data))
 }
 
 func (h *UserHandler) LoginGoogle(c *gin.Context) {
@@ -188,37 +172,33 @@ func (h *UserHandler) CallbackGoogle(c *gin.Context) {
 	code := c.Query("code")
 	token, err := h.userService.GoogleCallback(code)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "Token", "token": token})
-
+	c.JSON(http.StatusOK, response.Success("Login Google berhasil", gin.H{"token": token}))
 }
 
 func (h *UserHandler) GetMe(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
 	user, err := h.userService.GetProfile(userID)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User tidak ditemukan"})
+		c.JSON(http.StatusNotFound, response.Error("User tidak ditemukan"))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil profil", gin.H{
 		"id":                    user.ID,
 		"name":                  user.Name,
 		"email":                 user.Email,
 		"role":                  user.Role,
 		"is_two_factor_enabled": user.IsTwoFactorEnabled,
-	})
+	}))
 }
 
 func (h *UserHandler) GetUsers(c *gin.Context) {
 	users, err := h.userService.GetAllUsers()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal mengambil data users"})
+		c.JSON(http.StatusInternalServerError, response.Error("Gagal mengambil data users"))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Berhasil mengambil data users",
-		"data":    users,
-	})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil data users", users))
 }

@@ -32,6 +32,7 @@ type PipelineStage struct {
 	Color        string `json:"color" gorm:"type:varchar(20)"`
 	IsClosedWon  bool   `json:"is_closed_won" gorm:"default:false"`
 	IsClosedLost bool   `json:"is_closed_lost" gorm:"default:false"`
+	Probability  int    `json:"probability" gorm:"not null;default:0;check:probability >= 0 AND probability <= 100"`
 
 	// Relasi
 	Pipeline Pipeline `json:"pipeline,omitempty" gorm:"foreignKey:PipelineID"`

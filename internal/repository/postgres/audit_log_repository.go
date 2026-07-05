@@ -22,3 +22,12 @@ func (r *AuditRepository) CreateAuditLog(auditlog *entity.AuditLog) (*entity.Aud
 	}
 	return auditlog, nil
 }
+
+func (r *AuditRepository) GetAuditLogsByTargetID(targetID string) (*[]entity.AuditLog, error) {
+	var logs []entity.AuditLog
+	err := r.dbGorm.Where("target_id = ?", targetID).Order("created_at DESC").Find(&logs).Error
+	if err != nil {
+		return nil, err
+	}
+	return &logs, nil
+}

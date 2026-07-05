@@ -3,6 +3,7 @@ package v1
 import (
 	"crm-project/internal/models/entity"
 	"crm-project/internal/service"
+	"crm-project/pkg/response"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -27,6 +28,7 @@ type UpdatePipelineRequest struct {
 	Description *string `json:"description"`
 	IsActive    *bool   `json:"is_active"`
 	IsDefault   *bool   `json:"is_default"`
+	Probability *int    `json:"probability"`
 }
 
 type CreateStageRequest struct {
@@ -34,6 +36,7 @@ type CreateStageRequest struct {
 	Color        string `json:"color"`
 	IsClosedWon  bool   `json:"is_closed_won"`
 	IsClosedLost bool   `json:"is_closed_lost"`
+	Probability  *int   `json:"probability"`
 }
 
 type UpdatePipelineStageRequest struct {
@@ -41,6 +44,7 @@ type UpdatePipelineStageRequest struct {
 	Color        *string `json:"color"`
 	IsClosedWon  *bool   `json:"is_closed_won"`
 	IsClosedLost *bool   `json:"is_closed_lost"`
+	Probability  *int    `json:"probability"`
 }
 
 type ReorderStagesRequest struct {
@@ -50,42 +54,41 @@ type ReorderStagesRequest struct {
 func (h *PipelineHandler) CreatePipeline(c *gin.Context) {
 	var req CreatePipelineRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 	userID := c.MustGet("user_id").(string)
 	data, err := h.pipelineService.CreatePipeline(req.Name, req.Description, userID, req.IsDefault)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"status": "Pipeline berhasil dibuat", "data": data})
+	c.JSON(http.StatusCreated, response.Success("Pipeline berhasil dibuat", data))
 }
 
 func (h *PipelineHandler) GetAllPipelines(c *gin.Context) {
 	data, err := h.pipelineService.GetAllPipelines()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": data})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil daftar pipeline", data))
 }
 
 func (h *PipelineHandler) GetPipelineByID(c *gin.Context) {
-	pipelineID := c.Param("id")
-	data, err := h.pipelineService.GetPipelineByID(pipelineID)
+	data, err := h.pipelineService.GetPipelineByID(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Pipeline tidak ditemukan"})
+		c.JSON(http.StatusNotFound, response.Error("Pipeline tidak ditemukan"))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"data": data})
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil pipeline", data))
 }
 
 func (h *PipelineHandler) UpdatePipeline(c *gin.Context) {
 	pipelineID := c.Param("id")
 	var req UpdatePipelineRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 
@@ -103,41 +106,53 @@ func (h *PipelineHandler) UpdatePipeline(c *gin.Context) {
 	setDefault := req.IsDefault != nil && *req.IsDefault
 
 	if err := h.pipelineService.UpdatePipeline(pipelineID, updates, setDefault); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "Pipeline berhasil diupdate"})
+	c.JSON(http.StatusOK, response.Success("Pipeline berhasil diupdate", nil))
 }
 
 func (h *PipelineHandler) DeletePipeline(c *gin.Context) {
-	pipelineID := c.Param("id")
-	if err := h.pipelineService.DeletePipeline(pipelineID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := h.pipelineService.DeletePipeline(c.Param("id")); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "Pipeline berhasil dihapus"})
+	c.JSON(http.StatusOK, response.Success("Pipeline berhasil dihapus", nil))
 }
 
 func (h *PipelineHandler) AddStage(c *gin.Context) {
 	pipelineID := c.Param("id")
 	var req CreateStageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	data, err := h.pipelineService.AddStage(pipelineID, req.Name, req.Color, req.IsClosedWon, req.IsClosedLost)
+	if req.Probability != nil && (*req.Probability < 0 || *req.Probability > 100) {
+		c.JSON(http.StatusBadRequest, response.Error("Probability harus antara 0 dan 100"))
+		return
+	}
+	probability := 0
+	if req.Probability != nil {
+		probability = *req.Probability
+	}
+	data, err := h.pipelineService.AddStage(pipelineID, req.Name, req.Color, req.IsClosedWon, req.IsClosedLost, probability)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"status": "Stage berhasil ditambahkan", "data": data})
+	c.JSON(http.StatusCreated, response.Success("Stage berhasil ditambahkan", data))
 }
 
 func (h *PipelineHandler) UpdateStage(c *gin.Context) {
 	stageID := c.Param("stageId")
 	var req UpdatePipelineStageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
+		return
+	}
+
+	if req.Probability != nil && (*req.Probability < 0 || *req.Probability > 100) {
+		c.JSON(http.StatusBadRequest, response.Error("probability harus antara 0-100"))
 		return
 	}
 
@@ -156,31 +171,30 @@ func (h *PipelineHandler) UpdateStage(c *gin.Context) {
 	}
 
 	if err := h.pipelineService.UpdateStage(stageID, updates); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "Stage berhasil diupdate"})
+	c.JSON(http.StatusOK, response.Success("Stage berhasil diupdate", nil))
 }
 
 func (h *PipelineHandler) DeleteStage(c *gin.Context) {
-	stageID := c.Param("stageId")
-	if err := h.pipelineService.DeleteStage(stageID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := h.pipelineService.DeleteStage(c.Param("stageId")); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "Stage berhasil dihapus"})
+	c.JSON(http.StatusOK, response.Success("Stage berhasil dihapus", nil))
 }
 
 func (h *PipelineHandler) ReorderStages(c *gin.Context) {
 	pipelineID := c.Param("id")
 	var req ReorderStagesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
 	if err := h.pipelineService.ReorderStages(pipelineID, req.Stages); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "Urutan stage berhasil diupdate"})
+	c.JSON(http.StatusOK, response.Success("Urutan stage berhasil diupdate", nil))
 }

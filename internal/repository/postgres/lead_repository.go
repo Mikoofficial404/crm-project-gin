@@ -3,6 +3,8 @@ package postgres
 import (
 	"context"
 	"crm-project/internal/models/entity"
+	"sort"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -13,6 +15,12 @@ type LeadRepository struct {
 
 func NewLeadRepository(db *gorm.DB) *LeadRepository {
 	return &LeadRepository{dbGorm: db}
+}
+
+type TimelineItem struct {
+	Type      string      `json:"type"`
+	Data      interface{} `json:"data"`
+	Timestamp time.Time   `json:"timestamp"`
 }
 
 func (r *LeadRepository) CreateLead(lead *entity.Lead) (*entity.Lead, error) {
@@ -30,7 +38,7 @@ func (r *LeadRepository) GetAllLeads(page int, limit int, search string, status 
 
 	query := r.dbGorm.Model(&entity.Lead{}).Preload("Contact")
 	if search != "" {
-		query = query.Where("name ILIKE ? OR email ILIKE ?", "%"+search+"%", "%"+search+"%")
+		query = query.Where("to_tsvector('simple', coalesce(name,'') || ' ' || coalesce(email,'') || ' ' || coalesce(phone,'')) @@ plainto_tsquery('simple', ?)", search)
 	}
 	if status != "" {
 		query = query.Where("status = ?", status)
@@ -55,7 +63,7 @@ func (r *LeadRepository) GetLeadsByUserId(userID string, page int, limit int, se
 
 	query := r.dbGorm.WithContext(ctx).Model(&entity.Lead{}).Preload("Contact").Where("assigned_to = ?", userID)
 	if search != "" {
-		query = query.Where("name ILIKE ? OR email ILIKE ?", "%"+search+"%", "%"+search+"%")
+		query = query.Where("to_tsvector('simple', coalesce(name,'') || ' ' || coalesce(email,'') || ' ' || coalesce(phone,'')) @@ plainto_tsquery('simple', ?)", search)
 	}
 	if status != "" {
 		query = query.Where("status = ?", status)
@@ -109,6 +117,49 @@ func (r *LeadRepository) SoftDeleteLead(leadID string) error {
 	return err
 }
 
+func (r *LeadRepository) GetLeadTimeline(leadID string) (*[]TimelineItem, error) {
+	var timeLines []TimelineItem
+	var activities []entity.Activity
+	if err := r.dbGorm.Where("lead_id = ?", leadID).Find(&activities).Error; err != nil {
+		return nil, err
+	}
+	for _, activity := range activities {
+		timeLines = append(timeLines, TimelineItem{
+			Type:      "activity",
+			Data:      activity,
+			Timestamp: activity.CreatedAt,
+		})
+	}
+
+	var deals []entity.Deal
+	if err := r.dbGorm.Where("lead_id = ?", leadID).Find(&deals).Error; err != nil {
+		return nil, err
+	}
+	for _, deal := range deals {
+		timeLines = append(timeLines, TimelineItem{
+			Type:      "deal",
+			Data:      deal,
+			Timestamp: deal.CreatedAt,
+		})
+	}
+
+	var tasks []entity.Task
+	if err := r.dbGorm.Where("lead_id = ?", leadID).Find(&tasks).Error; err != nil {
+		return nil, err
+	}
+	for _, task := range tasks {
+		timeLines = append(timeLines, TimelineItem{
+			Type:      "task",
+			Data:      task,
+			Timestamp: task.CreatedAt,
+		})
+	}
+	sort.Slice(timeLines, func(i, j int) bool {
+		return timeLines[i].Timestamp.After(timeLines[j].Timestamp)
+	})
+	return &timeLines, nil
+}
+
 func (r *LeadRepository) CreateBulkLeads(leadEntity *[]entity.Lead) ([]entity.Lead, error) {
 	csvInsert := r.dbGorm.Create(&leadEntity)
 	err := csvInsert.Error
@@ -143,7 +194,7 @@ func (r *LeadRepository) RestoreLead(leadID string) error {
 func (r *LeadRepository) SearchLeads(keyword string) ([]entity.Lead, error) {
 	ctx := context.Background()
 	var leads []entity.Lead
-	err := r.dbGorm.WithContext(ctx).Preload("Contact").Where("name ILIKE ?", "%"+keyword+"%").Find(&leads).Error
+	err := r.dbGorm.WithContext(ctx).Preload("Contact").Where("to_tsvector('simple', name || ' ' || COALESCE(email, '') || ' ' || COALESCE(phone, '')) @@ plainto_tsquery('simple', ?)", keyword).Find(&leads).Error
 	if err != nil {
 		return nil, err
 	}
@@ -158,4 +209,22 @@ func (r *LeadRepository) UpdateLead(leadID string, name string, email string, ph
 		"phone": phone,
 	}).Error
 	return err
+}
+
+func (r *LeadRepository) GetAgingLeads(userID, role string, days int) ([]entity.Lead, error) {
+	var leads []entity.Lead
+	query := r.dbGorm.Model(&entity.Lead{}).
+		Preload("Contact").
+		Where("status NOT IN ? AND updated_at < NOW() - (? * INTERVAL '1 day')", []string{"WON", "LOST"}, days).
+		Order("updated_at ASC")
+
+	if role == "sales" {
+		query = query.Where("assigned_to = ?", userID)
+	}
+
+	err := query.Find(&leads).Error
+	if err != nil {
+		return nil, err
+	}
+	return leads, nil
 }

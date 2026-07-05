@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
+	"github.com/sirupsen/logrus"
 )
 
 type GowaWebhookPayload struct {
@@ -70,18 +71,21 @@ func (h *WebhookHandler) ReceiveWhatsApp(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("CHAT WA MASUK DARI %s (%s): %s\n", payload.Payload.FromName, payload.Payload.From, payload.Payload.Body)
+	logrus.WithFields(logrus.Fields{
+		"from": payload.Payload.From,
+		"name": payload.Payload.FromName,
+	}).Info("Chat WA masuk")
 
 	phone := strings.Split(payload.Payload.From, "@")[0]
 
 	existingLead, _ := h.leadRepo.GetLeadByPhone(phone)
 	if existingLead == nil {
-		fmt.Println("[Webhook] Klien baru terdeteksi! Membuat Lead otomatis...")
+		logrus.Info("[Webhook] Klien baru terdeteksi! Membuat Lead otomatis...")
 
 		// round-robin assign ke sales
 		salesAll, err := h.userRepo.GetAllUsers()
 		if err != nil {
-			fmt.Println("Error get users:", err)
+			logrus.WithError(err).Error("[Webhook] Gagal get users")
 			c.JSON(200, gin.H{"status": "ok"})
 			return
 		}
@@ -98,7 +102,7 @@ func (h *WebhookHandler) ReceiveWhatsApp(c *gin.Context) {
 
 		contact, errContact := h.contactService.FindOrCreateContact(payload.Payload.FromName, phone, assignedID)
 		if errContact != nil {
-			fmt.Println("[Webhook] Gagal FindOrCreateContact:", errContact)
+			logrus.WithError(errContact).Warn("[Webhook] Gagal FindOrCreateContact")
 		}
 
 		var contactID *string
@@ -108,13 +112,13 @@ func (h *WebhookHandler) ReceiveWhatsApp(c *gin.Context) {
 
 		newLead, errCreate := h.leadService.CreateLeadWithContact(payload.Payload.FromName, "", phone, assignedID, nil, contactID)
 		if errCreate != nil {
-			fmt.Println("Gagal membuat Lead otomatis:", errCreate)
+			logrus.WithError(errCreate).Error("[Webhook] Gagal membuat Lead otomatis")
 		} else {
 			h.activitySvc.CreateActivity("WhatsApp", payload.Payload.Body, newLead.ID, assignedID, "")
 			go func() {
 				aiReply, errAi := h.aiService.GenerateSalesReply(payload.Payload.FromName, payload.Payload.Body)
 				if errAi != nil {
-					fmt.Println("[AI Error]:", errAi)
+					logrus.WithError(errAi).Warn("[Webhook] AI Error, fallback ke bot reply")
 					h.waService.SendWA(phone, "Terima kasih telah menghubungi kami. Tim kami akan segera membalas pesan Anda.")
 					h.activitySvc.CreateActivity("Catatan", "Bot Reply: Terima kasih telah menghubungi kami...", newLead.ID, assignedID, "")
 				} else {
@@ -124,7 +128,7 @@ func (h *WebhookHandler) ReceiveWhatsApp(c *gin.Context) {
 			}()
 		}
 	} else {
-		fmt.Printf("[Webhook] Klien Lama (%s) mengirim pesan.\n", existingLead.Name)
+		logrus.WithField("name", existingLead.Name).Info("[Webhook] Klien lama mengirim pesan")
 		assigneeID := existingLead.AssignedTo
 		if assigneeID == "" || assigneeID == "00000000-0000-0000-0000-000000000000" {
 			firstUser, _ := h.userRepo.GetFirstUser()
@@ -137,20 +141,20 @@ func (h *WebhookHandler) ReceiveWhatsApp(c *gin.Context) {
 
 		_, errAct := h.activitySvc.CreateActivity("WhatsApp", payload.Payload.Body, existingLead.ID, assigneeID, "")
 		if errAct != nil {
-			fmt.Println("Gagal mencatat Aktivitas:", errAct)
+			logrus.WithError(errAct).Error("[Webhook] Gagal mencatat Aktivitas")
 		} else {
 			notifTitle := fmt.Sprintf("Pesan Wa: %s", existingLead.Name)
 			errNotif := h.notifSvc.CreateNotification(assigneeID, notifTitle, payload.Payload.Body)
 			if errNotif != nil {
-				fmt.Println("Gagal membuat Notifikasi:", errNotif)
+				logrus.WithError(errNotif).Warn("[Webhook] Gagal membuat Notifikasi")
 			}
 
 			wsMessage := fmt.Sprintf(`{"type":"new_whatsapp","title":"%s","message":"%s"}`, notifTitle, payload.Payload.Body)
 			errWs := websocket.SendMessageToUser(assigneeID, wsMessage)
 			if errWs != nil {
-				fmt.Printf("[Webhook] User %s sedang offline, WebSocket dilewati.\n", assigneeID)
+				logrus.WithField("user_id", assigneeID).Info("[Webhook] User sedang offline, WebSocket dilewati")
 			} else {
-				fmt.Println("[Webhook] Sinyal WebSocket berhasil dikirim!")
+				logrus.Info("[Webhook] Sinyal WebSocket berhasil dikirim")
 			}
 		}
 	}

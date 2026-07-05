@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crm-project/internal/delivery/http/middleware"
 	v1 "crm-project/internal/delivery/http/v1"
 	"crm-project/internal/delivery/websocket"
@@ -9,7 +10,11 @@ import (
 	"crm-project/internal/worker"
 	"crm-project/pkg/database"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
@@ -42,6 +47,7 @@ func main() {
 	}
 
 	r := gin.Default()
+	r.Use(middleware.RequestIDMiddleware())
 
 	r.Static("/uploads", "./uploads")
 	clientAsynq := asynq.NewClient(asynq.RedisClientOpt{Addr: "localhost:6380"})
@@ -63,32 +69,38 @@ func main() {
 
 	userRepo := postgres.NewUserRepository(database.GetDB())
 	authService := service.NewUserService(userRepo, rdb, clientAsynq)
-	authHandler := v1.NewUserHandler(authService, rdb)
+	authHandler := v1.NewUserHandler(authService)
 
 	dealRepo := postgres.NewDealRepository(database.GetDB())
 	pipelineStageRepo := postgres.NewPipelineStageRepository(database.GetDB())
 	dealProductRepo := postgres.NewDealProductRepository(database.GetDB())
+	dealHistoryRepo := postgres.NewDealHistoryRepository(database.GetDB())
 
 	invoiceRepo := postgres.NewInvoiceRepository(database.GetDB())
 	auditRepo := postgres.NewAuditRepository(database.GetDB())
-	dealService := service.NewDealService(dealRepo, auditRepo, clientAsynq, invoiceRepo, rdb, pipelineStageRepo, dealProductRepo)
+
+	notifRepo := postgres.NewNotificationRepository(database.GetDB())
+	notifService := service.NewNotificationService(notifRepo)
+	notifHandler := v1.NewNotificationHandler(notifService)
+
+	dealCommentRepo := postgres.NewDealCommentRepository(database.GetDB())
+	dealCommentService := service.NewDealCommentService(dealCommentRepo, notifService)
+	dealCommentHandler := v1.NewDealCommentHandler(dealCommentService)
+
+	dealService := service.NewDealService(dealRepo, auditRepo, clientAsynq, invoiceRepo, rdb, pipelineStageRepo, dealProductRepo, dealHistoryRepo)
 	dealHandler := v1.NewDealHandler(dealService)
 
 	leadRepo := postgres.NewLeadRepository(database.GetDB())
 
 	contactRepo := postgres.NewContactRepository(database.GetDB())
-	contactService := service.NewContactService(contactRepo)
+	contactService := service.NewContactService(contactRepo, auditRepo)
 	contactHandler := v1.NewContactHandler(contactService)
 
-	leadService := service.NewLeadService(leadRepo, userRepo, clientAsynq, rdb, auditRepo, contactRepo)
+	leadService := service.NewLeadService(leadRepo, userRepo, clientAsynq, rdb, auditRepo, contactRepo, notifRepo)
 
 	activityRepo := postgres.NewActivityRepository(database.GetDB())
 	activityService := service.NewActivityService(activityRepo)
 	activityHandler := v1.NewAcitivyHandler(activityService)
-
-	notifRepo := postgres.NewNotificationRepository(database.GetDB())
-	notifService := service.NewNotificationService(notifRepo)
-	notifHandler := v1.NewNotificationHandler(notifService)
 
 	searchService := service.NewSearchService(leadRepo, dealRepo, userRepo, contactRepo)
 	searchHandler := v1.NewServiceHandler(searchService)
@@ -109,6 +121,10 @@ func main() {
 	reportService := service.NewReportService(reportRepo, rdb)
 	reportHandler := v1.NewReportHandler(reportService)
 
+	teamRepo := postgres.NewTeamRepository(database.GetDB())
+	teamService := service.NewTeamService(teamRepo, userRepo)
+	teamHandler := v1.NewTeamHandler(teamService)
+
 	campaignService := service.NewCampaignService(campaignRepo, campaignRecipientRepo, leadRepo, contactRepo, clientAsynq)
 	campaignHandler := v1.NewCampaignHandler(campaignService)
 
@@ -125,6 +141,9 @@ func main() {
 	r.GET("/api/v1/auth/google/login", authHandler.LoginGoogle)
 	r.GET("/api/v1/auth/google/callback", authHandler.CallbackGoogle)
 
+	healthHandler := v1.NewHealthHandler(database.GetDB(), rdb)
+	r.GET("/health", healthHandler.Check)
+
 	waService := service.NewWhatsAppService(
 		os.Getenv("WA_GOWA_URL"),
 		os.Getenv("WA_DEVICE_ID"),
@@ -136,7 +155,7 @@ func main() {
 	leadHandle := v1.NewLeadHandler(leadService, leadRepo, waService, activityService)
 
 	webhookHandler := v1.NewWebhookHandler(leadService, waService, userRepo, leadRepo, activityService, notifService, rdb, aiService, contactService)
-	r.POST("/api/v1/webhook/whatsapp", webhookHandler.ReceiveWhatsApp)
+	r.POST("/api/v1/webhook/whatsapp", middleware.WebhookAuthMiddleware(), webhookHandler.ReceiveWhatsApp)
 	protected := r.Group("/api/v1")
 	protected.Use(middleware.AuthMiddleware(rdb))
 
@@ -154,6 +173,7 @@ func main() {
 	protected.DELETE("/leads/:id", middleware.RoleMiddleware("admin"), leadHandle.DeleteLead)
 	protected.GET("/leads/trash", middleware.RoleMiddleware("admin"), leadHandle.GetTrashedLeads)
 	protected.POST("/leads/trash/:id/restore", middleware.RoleMiddleware("admin"), leadHandle.RestoreLead)
+	protected.GET("/leads/:id/timeline", leadHandle.GetLeadTimeline)
 
 	protected.POST("/deals", dealHandler.CreateDeal)
 	protected.GET("/deals", dealHandler.GetDeals)
@@ -166,7 +186,12 @@ func main() {
 	protected.POST("/deals/:id/products", dealHandler.AssignProduct)
 	protected.DELETE("/deals/:id/products/:productId", dealHandler.RemoveProduct)
 	protected.GET("/deals/:id/products", dealHandler.GetDealProducts)
-
+	protected.GET("/deals/trash", middleware.RoleMiddleware("admin"), dealHandler.GetTrashedDeals)
+	protected.POST("/deals/:id/restore", middleware.RoleMiddleware("admin"), dealHandler.RestoreDeal)
+	protected.GET("/deals/:id/history", dealHandler.GetDealHistory)
+	protected.POST("/deals/:id/comments", dealCommentHandler.AddComment)
+	protected.GET("/deals/:id/comments", dealCommentHandler.GetComments)
+	protected.DELETE("/deals/:id/comments/:commentId", dealCommentHandler.DeleteComment)
 	protected.PATCH("/invoices/:id/status", dealHandler.UpdateInvoiceStatus)
 
 	protected.POST("/activities", activityHandler.CreateActivity)
@@ -194,15 +219,19 @@ func main() {
 
 	protected.POST("/tasks", taskHandler.CreateTask)
 	protected.GET("/tasks", taskHandler.GetAllTasks)
+	protected.GET("/tasks/trash", middleware.RoleMiddleware("admin"), taskHandler.GetTrashedTasks)
 	protected.GET("/tasks/:id", taskHandler.GetTaskByID)
 	protected.PUT("/tasks/:id", taskHandler.UpdateTask)
 	protected.DELETE("/tasks/:id", taskHandler.DeleteTask)
 	protected.PATCH("/tasks/:id/done", taskHandler.MarkAsDone)
+	protected.POST("/tasks/:id/restore", middleware.RoleMiddleware("admin"), taskHandler.RestoreTask)
 
 	protected.POST("/contacts", contactHandler.CreateContact)
 	protected.GET("/contacts", contactHandler.GetAllContacts)
+	protected.GET("/contacts/trash", middleware.RoleMiddleware("admin"), contactHandler.GetTrashedContacts)
 	protected.GET("/contacts/:id", contactHandler.GetContactByID)
 	protected.PATCH("/contacts/:id", contactHandler.UpdateContact)
+	protected.PATCH("/contacts/:id/restore", middleware.RoleMiddleware("admin"), contactHandler.RestoreContact)
 	protected.DELETE("/contacts/:id", contactHandler.DeleteContact)
 
 	adminPipeline := protected.Group("/pipelines")
@@ -222,6 +251,7 @@ func main() {
 	protected.GET("/reports/sales-performance", middleware.RoleMiddleware("admin"), reportHandler.GetSalesPerformance)
 	protected.GET("/reports/lead-source", middleware.RoleMiddleware("admin"), reportHandler.GetLeadSourceReport)
 	protected.GET("/reports/activity", middleware.RoleMiddleware("admin"), reportHandler.GetActivityReport)
+	protected.GET("/leads/aging", leadHandle.GetAgingLeads)
 
 	adminProduct := protected.Group("/products")
 	adminProduct.Use(middleware.RoleMiddleware("admin"))
@@ -231,9 +261,22 @@ func main() {
 	adminProduct.PATCH("/:id", productHandler.UpdateProduct)
 	adminProduct.DELETE("/:id", productHandler.DeleteProduct)
 
+	adminTeam := protected.Group("/teams")
+	adminTeam.Use(middleware.RoleMiddleware("admin"))
+	adminTeam.POST("", teamHandler.CreateTeam)
+	adminTeam.GET("", teamHandler.GetAllTeams)
+	adminTeam.GET("/:id", teamHandler.GetTeamByID)
+	adminTeam.PATCH("/:id", teamHandler.UpdateTeam)
+	adminTeam.DELETE("/:id", teamHandler.DeleteTeam)
+	adminTeam.POST("/:id/members", teamHandler.AddMember)
+	adminTeam.DELETE("/:id/members/:userId", teamHandler.RemoveMember)
+
 	adminGroup := protected.Group("/admin")
 	adminGroup.Use(middleware.RoleMiddleware("admin"))
 	adminGroup.GET("/users", authHandler.GetUsers)
+
+	cronHandler := v1.NewCronHandler(rdb)
+	adminGroup.GET("/crons", cronHandler.GetCronStatus)
 
 	adminCampaign := protected.Group("/campaigns")
 	adminCampaign.Use(middleware.RoleMiddleware("admin"))
@@ -252,14 +295,36 @@ func main() {
 
 	c.AddFunc("* * * * *", func() {
 		leadService.CheckStaleLeads()
+		rdb.Set(context.Background(), "cron:last_run:check_stale_leads", time.Now().UTC().Format(time.RFC3339), 0)
 	})
 	c.AddFunc("* * * * *", func() {
 		campaignService.ProcessScheduledCampaigns()
+		rdb.Set(context.Background(), "cron:last_run:process_scheduled_campaigns", time.Now().UTC().Format(time.RFC3339), 0)
 	})
 	c.AddFunc("0 8 * * *", func() {
 		taskService.SendDueDateReminders()
+		rdb.Set(context.Background(), "cron:last_run:send_due_date_reminders", time.Now().UTC().Format(time.RFC3339), 0)
 	})
 	c.Start()
 
-	r.Run(":8080")
+	srv := &http.Server{
+		Addr:    ":8080",
+		Handler: r,
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %v", err)
+		}
+	}()
+	<-ctx.Done()
+	stop()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	srv.Shutdown(shutdownCtx)
+	c.Stop()
+	rdb.Close()
+
 }
