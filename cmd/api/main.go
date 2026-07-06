@@ -162,6 +162,7 @@ func main() {
 
 	protected.POST("/logout", authHandler.Logout)
 	protected.GET("/me", authHandler.GetMe)
+	protected.GET("/me/login-history", authHandler.GetLoginHistory)
 	protected.PATCH("/profile/password", authHandler.ChangePassword)
 	protected.GET("/profile/2fa/setup", authHandler.Setup2FA)
 

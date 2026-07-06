@@ -4,6 +4,7 @@ import (
 	"crm-project/internal/config"
 	"crm-project/internal/models/entity"
 	"log"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"gorm.io/driver/postgres"
@@ -19,9 +20,16 @@ func DBConn() *gorm.DB {
 	}
 	dsn := cfg.GetDSN()
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	sqlDB, err := db.DB()
 	if err != nil {
 		logrus.Fatalf("Gagal membuka database: %v", err)
 	}
+
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetMaxOpenConns(100)
+	sqlDB.SetConnMaxLifetime(1 * time.Hour)
+	sqlDB.SetConnMaxIdleTime(10 * time.Minute)
+
 	logrus.Info("Berhasil terkoneksi ke Database PostgreSQL!")
 	DB = db
 	return db

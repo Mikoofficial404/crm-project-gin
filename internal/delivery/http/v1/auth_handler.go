@@ -4,6 +4,7 @@ import (
 	"crm-project/internal/service"
 	"crm-project/pkg/jwt"
 	"crm-project/pkg/response"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -205,4 +206,25 @@ func (h *UserHandler) GetUsers(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil data users", users))
+}
+
+func (h *UserHandler) GetLoginHistory(c *gin.Context) {
+	userID := c.MustGet("user_id").(string)
+
+	var limit int
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil || limit <= 0 {
+			limit = 10
+		}
+	} else {
+		limit = 10
+	}
+
+	histories, err := h.userService.GetLoginHistory(userID, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Gagal mengambil riwayat login"))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil riwayat login", histories))
 }

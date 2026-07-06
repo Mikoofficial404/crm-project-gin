@@ -325,3 +325,10 @@ func (s *UserService) Logout(userID string, token string) error {
 	redisKey := "blacklist:" + hex.EncodeToString(hash[:])
 	return s.rdb.Set(context.Background(), redisKey, "1", ttl).Err()
 }
+
+func (s *UserService) GetLoginHistory(userID string, limit int) ([]entity.LoginHistory, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	return s.loginHistory.GetLoginHistoriesByUserID(userID, limit)
+}
