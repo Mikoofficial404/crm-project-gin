@@ -35,6 +35,17 @@ type UpdateContactRequest struct {
 	AssignedTo *string `json:"assigned_to,omitempty"`
 }
 
+// CreateContact godoc
+// @Summary     Buat contact baru
+// @Description Buat contact baru ke sistem
+// @Tags        contacts
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       body body CreateContactRequest true "Data contact"
+// @Success     201 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /contacts [post]
 func (h *ContactHandler) CreateContact(c *gin.Context) {
 	var req CreateContactRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -61,6 +72,19 @@ func (h *ContactHandler) CreateContact(c *gin.Context) {
 	c.JSON(http.StatusCreated, response.Success("Contact berhasil dibuat", data))
 }
 
+// GetAllContacts godoc
+// @Summary     List contacts
+// @Description Ambil daftar contacts dengan filter dan pagination
+// @Tags        contacts
+// @Security    BearerAuth
+// @Produce     json
+// @Param       page   query int    false "Halaman (default 1)"
+// @Param       limit  query int    false "Jumlah per halaman (default 10)"
+// @Param       search query string false "Kata kunci pencarian"
+// @Param       source query string false "Filter source (whatsapp/manual)"
+// @Success     200 {object} response.PaginatedResponse
+// @Failure     500 {object} response.Response
+// @Router      /contacts [get]
 func (h *ContactHandler) GetAllContacts(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
@@ -76,6 +100,16 @@ func (h *ContactHandler) GetAllContacts(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Paginated(data, total, page, limit))
 }
 
+// GetContactByID godoc
+// @Summary     Detail contact
+// @Description Ambil detail contact berdasarkan ID
+// @Tags        contacts
+// @Security    BearerAuth
+// @Produce     json
+// @Param       id path string true "Contact ID"
+// @Success     200 {object} response.Response
+// @Failure     404 {object} response.Response
+// @Router      /contacts/{id} [get]
 func (h *ContactHandler) GetContactByID(c *gin.Context) {
 	id := c.Param("id")
 
@@ -92,6 +126,18 @@ func (h *ContactHandler) GetContactByID(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil contact", data))
 }
 
+// UpdateContact godoc
+// @Summary     Update contact
+// @Description Update data contact secara partial
+// @Tags        contacts
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       id   path string              true "Contact ID"
+// @Param       body body UpdateContactRequest true "Data yang diupdate"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /contacts/{id} [patch]
 func (h *ContactHandler) UpdateContact(c *gin.Context) {
 	id := c.Param("id")
 
@@ -134,6 +180,15 @@ func (h *ContactHandler) UpdateContact(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Contact berhasil diupdate", nil))
 }
 
+// GetTrashedContacts godoc
+// @Summary     Contacts yang dihapus
+// @Description Ambil daftar contact yang sudah di-soft delete
+// @Tags        contacts
+// @Security    BearerAuth
+// @Produce     json
+// @Success     200 {object} response.Response
+// @Failure     500 {object} response.Response
+// @Router      /contacts/trash [get]
 func (h *ContactHandler) GetTrashedContacts(c *gin.Context) {
 	userID := c.GetString("user_id")
 	role := c.GetString("role")
@@ -147,6 +202,16 @@ func (h *ContactHandler) GetTrashedContacts(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil contact yang dihapus", contacts))
 }
 
+// RestoreContact godoc
+// @Summary     Restore contact
+// @Description Restore contact yang sudah di-soft delete
+// @Tags        contacts
+// @Security    BearerAuth
+// @Produce     json
+// @Param       id path string true "Contact ID"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /contacts/{id}/restore [patch]
 func (h *ContactHandler) RestoreContact(c *gin.Context) {
 	id := c.Param("id")
 
@@ -158,6 +223,16 @@ func (h *ContactHandler) RestoreContact(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Contact berhasil direstore", nil))
 }
 
+// ExportContactsCSV godoc
+// @Summary     Export contacts ke CSV
+// @Description Download daftar contacts dalam format CSV
+// @Tags        contacts
+// @Security    BearerAuth
+// @Produce     text/csv
+// @Param       source query string false "Filter source (whatsapp/manual)"
+// @Success     200
+// @Failure     500 {object} response.Response
+// @Router      /contacts/export [get]
 func (h *ContactHandler) ExportContactsCSV(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
 	role := c.MustGet("role").(string)
@@ -203,6 +278,17 @@ func (h *ContactHandler) ExportContactsCSV(c *gin.Context) {
 	writer.Flush()
 }
 
+// ImportContactsCSV godoc
+// @Summary     Import contacts dari CSV
+// @Description Upload file CSV untuk import contacts secara massal
+// @Tags        contacts
+// @Security    BearerAuth
+// @Accept      multipart/form-data
+// @Produce     json
+// @Param       file formData file true "File CSV"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /contacts/import [post]
 func (h *ContactHandler) ImportContactsCSV(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
 
@@ -236,6 +322,16 @@ func (h *ContactHandler) ImportContactsCSV(c *gin.Context) {
 	}))
 }
 
+// DeleteContact godoc
+// @Summary     Hapus contact
+// @Description Soft delete contact berdasarkan ID
+// @Tags        contacts
+// @Security    BearerAuth
+// @Produce     json
+// @Param       id path string true "Contact ID"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /contacts/{id} [delete]
 func (h *ContactHandler) DeleteContact(c *gin.Context) {
 	id := c.Param("id")
 

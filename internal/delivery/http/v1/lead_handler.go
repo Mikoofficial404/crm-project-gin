@@ -50,6 +50,17 @@ type UpdateLeadRequest struct {
 	Phone string `json:"phone" binding:"required"`
 }
 
+// CreateLeader godoc
+// @Summary     Buat lead baru
+// @Description Buat lead baru ke sistem
+// @Tags        leads
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       body body CreateLeadRequest true "Data lead"
+// @Success     201 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /leads [post]
 func (h *LeadHandler) CreateLeader(c *gin.Context) {
 	var req CreateLeadRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -65,6 +76,15 @@ func (h *LeadHandler) CreateLeader(c *gin.Context) {
 	c.JSON(http.StatusCreated, response.Success("Lead berhasil dibuat", data))
 }
 
+// GetTrashedLeads godoc
+// @Summary     Lead yang dihapus
+// @Description Ambil daftar lead yang sudah di-soft delete
+// @Tags        leads
+// @Security    BearerAuth
+// @Produce     json
+// @Success     200 {object} response.Response
+// @Failure     500 {object} response.Response
+// @Router      /leads/trash [get]
 func (h *LeadHandler) GetTrashedLeads(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
 	role := c.MustGet("role").(string)
@@ -76,6 +96,16 @@ func (h *LeadHandler) GetTrashedLeads(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil lead yang dihapus", data))
 }
 
+// RestoreLead godoc
+// @Summary     Restore lead
+// @Description Pulihkan lead yang sudah dihapus (admin only)
+// @Tags        leads
+// @Security    BearerAuth
+// @Produce     json
+// @Param       id path string true "Lead ID"
+// @Success     200 {object} response.Response
+// @Failure     500 {object} response.Response
+// @Router      /leads/trash/{id}/restore [post]
 func (h *LeadHandler) RestoreLead(c *gin.Context) {
 	id := c.Param("id")
 	userID := c.MustGet("user_id").(string)
@@ -88,6 +118,21 @@ func (h *LeadHandler) RestoreLead(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Lead berhasil direstore", nil))
 }
 
+// GetLeads godoc
+// @Summary     List leads
+// @Description Ambil daftar leads dengan filter dan pagination
+// @Tags        leads
+// @Security    BearerAuth
+// @Produce     json
+// @Param       page      query int    false "Halaman (default 1)"
+// @Param       limit     query int    false "Jumlah per halaman (default 10)"
+// @Param       search    query string false "Kata kunci pencarian"
+// @Param       status    query string false "Filter status lead"
+// @Param       startDate query string false "Filter dari tanggal (YYYY-MM-DD)"
+// @Param       endDate   query string false "Filter sampai tanggal (YYYY-MM-DD)"
+// @Success     200 {object} response.PaginatedResponse
+// @Failure     400 {object} response.Response
+// @Router      /leads [get]
 func (h *LeadHandler) GetLeads(c *gin.Context) {
 	userId := c.MustGet("user_id").(string)
 	role := c.MustGet("role").(string)
@@ -113,6 +158,16 @@ func (h *LeadHandler) GetLeads(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Paginated(data, total, page, limit))
 }
 
+// GetLeadByID godoc
+// @Summary     Detail lead
+// @Description Ambil detail lead berdasarkan ID
+// @Tags        leads
+// @Security    BearerAuth
+// @Produce     json
+// @Param       id path string true "Lead ID"
+// @Success     200 {object} response.Response
+// @Failure     404 {object} response.Response
+// @Router      /leads/{id} [get]
 func (h *LeadHandler) GetLeadByID(c *gin.Context) {
 	leadID := c.Param("id")
 	if leadID == "" {
@@ -129,6 +184,18 @@ func (h *LeadHandler) GetLeadByID(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil lead", data))
 }
 
+// UpdateStatusLeads godoc
+// @Summary     Update status lead
+// @Description Update status lead (NEW, CONTACTED, dll)
+// @Tags        leads
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       id   path string             true "Lead ID"
+// @Param       body body UpdateStatusReques true "Status baru"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /leads/{id}/status [patch]
 func (h *LeadHandler) UpdateStatusLeads(c *gin.Context) {
 	catchId := c.Param("id")
 	var request struct {
@@ -152,6 +219,16 @@ func (h *LeadHandler) UpdateStatusLeads(c *gin.Context) {
 	c.JSON(http.StatusAccepted, response.Success("Status lead berhasil diupdate", gin.H{"id": catchId, "status": request.Status}))
 }
 
+// DeleteLead godoc
+// @Summary     Hapus lead
+// @Description Soft delete lead berdasarkan ID (admin only)
+// @Tags        leads
+// @Security    BearerAuth
+// @Produce     json
+// @Param       id path string true "Lead ID"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /leads/{id} [delete]
 func (h *LeadHandler) DeleteLead(c *gin.Context) {
 	leadID := c.Param("id")
 	if leadID == "" {
@@ -170,6 +247,18 @@ func (h *LeadHandler) DeleteLead(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Lead berhasil dihapus", gin.H{"id": leadID}))
 }
 
+// ReplyWhatsApp godoc
+// @Summary     Balas pesan WhatsApp
+// @Description Kirim balasan WhatsApp ke lead
+// @Tags        leads
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       id   path string          true "Lead ID"
+// @Param       body body SendReplyRequest true "Pesan balasan"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /leads/{id}/reply [post]
 func (h *LeadHandler) ReplyWhatsApp(c *gin.Context) {
 	idMessage := c.Param("id")
 	if idMessage == "" {
@@ -204,6 +293,17 @@ func (h *LeadHandler) ReplyWhatsApp(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Pesan WhatsApp terkirim", activity))
 }
 
+// ImportCSV godoc
+// @Summary     Import leads dari CSV
+// @Description Upload file CSV untuk import data leads
+// @Tags        leads
+// @Security    BearerAuth
+// @Accept      multipart/form-data
+// @Produce     json
+// @Param       file formData file true "File CSV"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /leads/import [post]
 func (h *LeadHandler) ImportCSV(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
 	file, err := c.FormFile("file")
@@ -245,6 +345,16 @@ func (h *LeadHandler) ImportCSV(c *gin.Context) {
 	c.JSON(http.StatusCreated, response.Success("Sukses import lead dari CSV", gin.H{"total": len(daftarBaru)}))
 }
 
+// GetAgingLeads godoc
+// @Summary     Lead yang sudah lama tidak diupdate
+// @Description Ambil leads yang tidak disentuh lebih dari X hari
+// @Tags        leads
+// @Security    BearerAuth
+// @Produce     json
+// @Param       days query int false "Jumlah hari (default 7)"
+// @Success     200 {object} response.Response
+// @Failure     500 {object} response.Response
+// @Router      /leads/aging [get]
 func (h *LeadHandler) GetAgingLeads(c *gin.Context) {
 	days := 7
 	if c.Query("days") != "" {
@@ -260,6 +370,16 @@ func (h *LeadHandler) GetAgingLeads(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Daftar lead yang menderita kemarin", leads))
 }
 
+// GetLeadTimeline godoc
+// @Summary     Timeline aktivitas lead
+// @Description Ambil semua aktivitas, deals, dan tasks dari sebuah lead
+// @Tags        leads
+// @Security    BearerAuth
+// @Produce     json
+// @Param       id path string true "Lead ID"
+// @Success     200 {object} response.Response
+// @Failure     500 {object} response.Response
+// @Router      /leads/{id}/timeline [get]
 func (h *LeadHandler) GetLeadTimeline(c *gin.Context) {
 	leadID := c.Param("id")
 	if leadID == "" {
@@ -276,6 +396,18 @@ func (h *LeadHandler) GetLeadTimeline(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Timeline lead", timelines))
 }
 
+// UpdateLead godoc
+// @Summary     Update data lead
+// @Description Update nama, email, dan nomor HP lead
+// @Tags        leads
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       id   path string          true "Lead ID"
+// @Param       body body UpdateLeadRequest true "Data lead yang diupdate"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /leads/{id} [put]
 func (h *LeadHandler) UpdateLead(c *gin.Context) {
 	leadID := c.Param("id")
 	if leadID == "" {

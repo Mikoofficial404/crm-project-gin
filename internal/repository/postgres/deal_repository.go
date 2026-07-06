@@ -146,6 +146,21 @@ func (r *DealRepository) SoftDeleteDeal(dealID string) error {
 	return err
 }
 
+func (r *DealRepository) GetDealsWithActiveSLA() ([]entity.Deal, error) {
+	var deals []entity.Deal
+	err := r.dbGorm.Preload("Stage").
+		Joins("JOIN pipeline_stages ON pipeline_stages.id = deals.stage_id").
+		Where("pipeline_stages.sla_hours > 0 AND deals.sla_breached = false").
+		Find(&deals).Error
+	return deals, err
+}
+
+func (r *DealRepository) MarkSLABreached(dealID string) error {
+	return r.dbGorm.Model(&entity.Deal{}).
+		Where("id = ?", dealID).
+		Update("sla_breached", true).Error
+}
+
 func (r *DealRepository) SearchDeals(keyword string) ([]entity.Deal, error) {
 	var deals []entity.Deal
 	err := r.dbGorm.

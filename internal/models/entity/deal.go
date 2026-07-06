@@ -7,14 +7,16 @@ import (
 )
 
 type Deal struct {
-	ID         string  `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
-	Name       string  `json:"name" gorm:"not null"`
-	Value      float64 `json:"value"`
-	PipelineID string  `json:"pipelineId" gorm:"type:uuid;not null;index"`
-	StageID    string  `json:"stageId" gorm:"type:uuid;not null;index"`
-	LeadID     string  `json:"leadId" gorm:"type:uuid;not null;index"`
-	AssignedTo string  `json:"assignedTo" gorm:"type:uuid;not null"`
-	Position   int     `json:"position"`
+	ID             string    `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	Name           string    `json:"name" gorm:"not null"`
+	Value          float64   `json:"value"`
+	PipelineID     string    `json:"pipelineId" gorm:"type:uuid;not null;index"`
+	StageID        string    `json:"stageId" gorm:"type:uuid;not null;index"`
+	LeadID         string    `json:"leadId" gorm:"type:uuid;not null;index"`
+	AssignedTo     string    `json:"assignedTo" gorm:"type:uuid;not null"`
+	Position       int       `json:"position"`
+	StageEnteredAt time.Time `json:"stageEnteredAt" gorm:"not null;default:now()"`
+	SLABreached    bool      `json:"slaBreached" gorm:"default:false"`
 
 	// Relasi
 	Pipeline     Pipeline      `json:"pipeline,omitempty" gorm:"foreignKey:PipelineID"`

@@ -33,6 +33,7 @@ type PipelineStage struct {
 	IsClosedWon  bool   `json:"is_closed_won" gorm:"default:false"`
 	IsClosedLost bool   `json:"is_closed_lost" gorm:"default:false"`
 	Probability  int    `json:"probability" gorm:"not null;default:0;check:probability >= 0 AND probability <= 100"`
+	SLAHours     int    `json:"sla_hours" gorm:"not null;default:0"`
 
 	// Relasi
 	Pipeline Pipeline `json:"pipeline,omitempty" gorm:"foreignKey:PipelineID"`

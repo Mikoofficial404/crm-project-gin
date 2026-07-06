@@ -34,6 +34,15 @@ type UpdateTaskRequest struct {
 	Category    *string    `json:"category"`
 }
 
+// @Summary      Buat task baru
+// @Tags         Tasks
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body body CreateTaskRequest true "Data task"
+// @Success      201 {object} response.Response
+// @Failure      400 {object} response.Response
+// @Router       /tasks [post]
 func (h *TaskHandler) CreateTask(c *gin.Context) {
 	var req CreateTaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -59,6 +68,14 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 	c.JSON(http.StatusCreated, response.Success("Task berhasil dibuat", data))
 }
 
+// @Summary      List semua task
+// @Tags         Tasks
+// @Produce      json
+// @Security     BearerAuth
+// @Param        priority query string false "Filter priority (LOW/MEDIUM/HIGH/URGENT)"
+// @Param        category query string false "Filter category (FOLLOW_UP/MEETING/CALL/EMAIL/OTHER)"
+// @Success      200 {object} response.Response
+// @Router       /tasks [get]
 func (h *TaskHandler) GetAllTasks(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
 	role := c.MustGet("role").(string)
@@ -72,6 +89,14 @@ func (h *TaskHandler) GetAllTasks(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil tasks", data))
 }
 
+// @Summary      Get task by ID
+// @Tags         Tasks
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Task ID"
+// @Success      200 {object} response.Response
+// @Failure      404 {object} response.Response
+// @Router       /tasks/{id} [get]
 func (h *TaskHandler) GetTaskByID(c *gin.Context) {
 	taskID := c.Param("id")
 	data, err := h.taskService.GetTaskByID(taskID)
@@ -82,6 +107,16 @@ func (h *TaskHandler) GetTaskByID(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil task", data))
 }
 
+// @Summary      Update task
+// @Tags         Tasks
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Task ID"
+// @Param        body body UpdateTaskRequest true "Data task"
+// @Success      200 {object} response.Response
+// @Failure      400 {object} response.Response
+// @Router       /tasks/{id} [put]
 func (h *TaskHandler) UpdateTask(c *gin.Context) {
 	taskID := c.Param("id")
 	var req UpdateTaskRequest
@@ -109,6 +144,12 @@ func (h *TaskHandler) UpdateTask(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Task berhasil diupdate", nil))
 }
 
+// @Summary      List task yang dihapus (admin)
+// @Tags         Tasks
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200 {object} response.Response
+// @Router       /tasks/trash [get]
 func (h *TaskHandler) GetTrashedTasks(c *gin.Context) {
 	tasks, err := h.taskService.GetTrashedTasks()
 	if err != nil {
@@ -118,6 +159,14 @@ func (h *TaskHandler) GetTrashedTasks(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil tasks yang dihapus", tasks))
 }
 
+// @Summary      Restore task yang dihapus (admin)
+// @Tags         Tasks
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Task ID"
+// @Success      200 {object} response.Response
+// @Failure      400 {object} response.Response
+// @Router       /tasks/{id}/restore [post]
 func (h *TaskHandler) RestoreTask(c *gin.Context) {
 	taskID := c.Param("id")
 	if err := h.taskService.RestoreTask(taskID); err != nil {
@@ -127,6 +176,14 @@ func (h *TaskHandler) RestoreTask(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Berhasil mengembalikan task", nil))
 }
 
+// @Summary      Hapus task
+// @Tags         Tasks
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Task ID"
+// @Success      200 {object} response.Response
+// @Failure      400 {object} response.Response
+// @Router       /tasks/{id} [delete]
 func (h *TaskHandler) DeleteTask(c *gin.Context) {
 	taskID := c.Param("id")
 	userID := c.MustGet("user_id").(string)
@@ -139,6 +196,14 @@ func (h *TaskHandler) DeleteTask(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Task berhasil dihapus", nil))
 }
 
+// @Summary      Tandai task selesai
+// @Tags         Tasks
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Task ID"
+// @Success      200 {object} response.Response
+// @Failure      400 {object} response.Response
+// @Router       /tasks/{id}/done [patch]
 func (h *TaskHandler) MarkAsDone(c *gin.Context) {
 	taskID := c.Param("id")
 	userID := c.MustGet("user_id").(string)

@@ -1,5 +1,24 @@
 package main
 
+// @title           CRM Project API
+// @version         1.0
+// @description     API untuk sistem CRM (Customer Relationship Management)
+// @termsOfService  http://swagger.io/terms/
+
+// @contact.name   CRM Support
+// @contact.email  support@crm.com
+
+// @license.name  MIT
+// @license.url   https://opensource.org/licenses/MIT
+
+// @host      localhost:8080
+// @BasePath  /api/v1
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Masukkan token JWT dengan format: Bearer {token}
+
 import (
 	"context"
 	"crm-project/internal/delivery/http/middleware"
@@ -9,6 +28,7 @@ import (
 	"crm-project/internal/service"
 	"crm-project/internal/worker"
 	"crm-project/pkg/database"
+	"crm-project/pkg/metrics"
 	"log"
 	"net/http"
 	"os"
@@ -16,14 +36,28 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/getsentry/sentry-go"
+
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/robfig/cron/v3"
 	"github.com/sirupsen/logrus"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+
+	_ "crm-project/docs"
 )
 
 func main() {
+	if err := sentry.Init(sentry.ClientOptions{
+		Dsn:              os.Getenv("SENTRY_DSN"),
+		TracesSampleRate: 1.0,
+	}); err != nil {
+		logrus.Warnf("Sentry initialization failed: %v", err)
+	}
+	defer sentry.Flush(2 * time.Second)
 	err := godotenv.Load()
 	if err != nil {
 		logrus.Fatal("Error loading .env file")
@@ -48,6 +82,12 @@ func main() {
 
 	r := gin.Default()
 	r.Use(middleware.RequestIDMiddleware())
+	r.Use(middleware.SentryMiddleware())
+	r.Use(middleware.PrometheusMiddleware())
+
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+
+	metrics.Init()
 
 	r.Static("/uploads", "./uploads")
 	clientAsynq := asynq.NewClient(asynq.RedisClientOpt{Addr: "localhost:6380"})
@@ -88,7 +128,7 @@ func main() {
 	dealCommentService := service.NewDealCommentService(dealCommentRepo, notifService)
 	dealCommentHandler := v1.NewDealCommentHandler(dealCommentService)
 
-	dealService := service.NewDealService(dealRepo, auditRepo, clientAsynq, invoiceRepo, rdb, pipelineStageRepo, dealProductRepo, dealHistoryRepo)
+	dealService := service.NewDealService(dealRepo, auditRepo, clientAsynq, invoiceRepo, rdb, pipelineStageRepo, dealProductRepo, dealHistoryRepo, notifRepo)
 	dealHandler := v1.NewDealHandler(dealService)
 
 	leadRepo := postgres.NewLeadRepository(database.GetDB())
@@ -129,7 +169,18 @@ func main() {
 	campaignService := service.NewCampaignService(campaignRepo, campaignRecipientRepo, leadRepo, contactRepo, clientAsynq)
 	campaignHandler := v1.NewCampaignHandler(campaignService)
 
+	waService := service.NewWhatsAppService(
+		os.Getenv("WA_GOWA_URL"),
+		os.Getenv("WA_DEVICE_ID"),
+		os.Getenv("WA_BASIC_AUTH"),
+	)
+
 	mux.HandleFunc("email:campaign", worker.NewHandleCampaignEmailTask(
+		campaignRecipientRepo.UpdateRecipientStatus,
+		campaignService.MarkCampaignSentIfDone,
+	))
+	mux.HandleFunc("campaign:whatsapp", worker.NewHandleCampaignWhatsAppTask(
+		waService.SendWA,
 		campaignRecipientRepo.UpdateRecipientStatus,
 		campaignService.MarkCampaignSentIfDone,
 	))
@@ -144,12 +195,7 @@ func main() {
 
 	healthHandler := v1.NewHealthHandler(database.GetDB(), rdb)
 	r.GET("/health", healthHandler.Check)
-
-	waService := service.NewWhatsAppService(
-		os.Getenv("WA_GOWA_URL"),
-		os.Getenv("WA_DEVICE_ID"),
-		os.Getenv("WA_BASIC_AUTH"),
-	)
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	aiService := service.NewAIService(os.Getenv("GEMINI_API_KEY"))
 
@@ -308,6 +354,15 @@ func main() {
 	c.AddFunc("0 8 * * *", func() {
 		taskService.SendDueDateReminders()
 		rdb.Set(context.Background(), "cron:last_run:send_due_date_reminders", time.Now().UTC().Format(time.RFC3339), 0)
+	})
+	c.AddFunc("0 * * * *", func() {
+		dealService.CheckSLABreaches()
+		rdb.Set(context.Background(), "cron:last_run:check_sla", time.Now().UTC().Format(time.RFC3339), 0)
+	})
+
+	c.AddFunc("0 0 * * *", func() {
+		leadService.AutoCloseStaleLeads()
+		rdb.Set(context.Background(), "cron:last_run:auto_close_stale_leads", time.Now().UTC().Format(time.RFC3339), 0)
 	})
 	c.Start()
 

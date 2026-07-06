@@ -18,6 +18,13 @@ func NewNotificationHandler(notifService *service.NotificationService) *Notifica
 	}
 }
 
+// @Summary      List notifikasi yang belum dibaca
+// @Tags         Notifications
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200 {object} response.Response
+// @Failure      500 {object} response.Response
+// @Router       /notifications [get]
 func (h *NotificationHandler) GetMyNotifications(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
 
@@ -30,6 +37,14 @@ func (h *NotificationHandler) GetMyNotifications(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil notifikasi", notifications))
 }
 
+// @Summary      Tandai notifikasi sudah dibaca
+// @Tags         Notifications
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Notification ID"
+// @Success      200 {object} response.Response
+// @Failure      400 {object} response.Response
+// @Router       /notifications/{id}/read [patch]
 func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
 	notifID := c.Param("id")
@@ -43,6 +58,13 @@ func (h *NotificationHandler) MarkAsRead(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Notifikasi berhasil ditandai sudah dibaca", nil))
 }
 
+// @Summary      Tandai semua notifikasi sudah dibaca
+// @Tags         Notifications
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200 {object} response.Response
+// @Failure      400 {object} response.Response
+// @Router       /notifications/read-all [patch]
 func (h *NotificationHandler) MarkAllAsRead(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
 

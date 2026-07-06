@@ -9,7 +9,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/jung-kurt/gofpdf"
 	"github.com/redis/go-redis/v9"
@@ -25,9 +27,10 @@ type DealService struct {
 	stageRepo       *postgres.PipelineStageRepository
 	dealProductRepo *postgres.DealProductRepository
 	dealHistoryRepo *postgres.DealHistoryRepository
+	notifRepo       *postgres.NotificationRepository
 }
 
-func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.AuditRepository, asyncClient *asynq.Client, invoiceRepo *postgres.InvoiceRepository, redisClient *redis.Client, stageRepo *postgres.PipelineStageRepository, dealProductRepo *postgres.DealProductRepository, dealHistoryRepo *postgres.DealHistoryRepository) *DealService {
+func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.AuditRepository, asyncClient *asynq.Client, invoiceRepo *postgres.InvoiceRepository, redisClient *redis.Client, stageRepo *postgres.PipelineStageRepository, dealProductRepo *postgres.DealProductRepository, dealHistoryRepo *postgres.DealHistoryRepository, notifRepo *postgres.NotificationRepository) *DealService {
 	return &DealService{
 		deal:            dealRepo,
 		AuditLog:        auditRepo,
@@ -37,6 +40,7 @@ func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.Audit
 		stageRepo:       stageRepo,
 		dealProductRepo: dealProductRepo,
 		dealHistoryRepo: dealHistoryRepo,
+		notifRepo:       notifRepo,
 	}
 }
 
@@ -506,6 +510,38 @@ func (s *DealService) AssignProductToDeal(dealID, productID string, quantity int
 	}
 
 	return s.dealProductRepo.AssignProduct(dealProduct)
+}
+
+func (s *DealService) CheckSLABreaches() ([]entity.Deal, error) {
+	deals, err := s.deal.GetDealsWithActiveSLA()
+	if err != nil {
+		return nil, err
+	}
+
+	var breachDeals []entity.Deal
+	now := time.Now()
+	for _, deal := range deals {
+		deadLine := deal.StageEnteredAt.Add(time.Duration(deal.Stage.SLAHours) * time.Hour)
+		if now.After(deadLine) && !deal.SLABreached {
+			breachDeals = append(breachDeals, deal)
+			s.deal.MarkSLABreached(deal.ID)
+			userID, err := uuid.Parse(deal.AssignedTo)
+			if err == nil {
+				title := fmt.Sprintf("SLA Breach: %s", deal.Name)
+				message := fmt.Sprintf("Deal '%s' telah melewati batas waktu SLA %d jam", deal.Name, deal.Stage.SLAHours)
+				s.notifRepo.CreateNotification(&entity.Notification{
+					UserID:  userID,
+					Title:   title,
+					Message: message,
+				})
+
+				wsMsg := fmt.Sprintf(`{"type":"sla_breach","title":"%s","message":"%s"}`, title, message)
+				websocket.SendMessageToUser(deal.AssignedTo, wsMsg)
+			}
+		}
+	}
+
+	return breachDeals, nil
 }
 
 func (s *DealService) RemoveProductFromDeal(dealID, productID, userID, role string) error {

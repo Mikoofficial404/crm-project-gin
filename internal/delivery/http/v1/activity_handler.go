@@ -37,6 +37,15 @@ func NewAcitivyHandler(activityService *service.ActivityService) *ActivityHandle
 	}
 }
 
+// @Summary      Buat aktivitas baru
+// @Tags         Activities
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body body CreateActivity true "Data aktivitas"
+// @Success      201 {object} response.Response
+// @Failure      400 {object} response.Response
+// @Router       /activities [post]
 func (h *ActivityHandler) CreateActivity(c *gin.Context) {
 	var req CreateActivity
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -52,6 +61,16 @@ func (h *ActivityHandler) CreateActivity(c *gin.Context) {
 	c.JSON(http.StatusCreated, response.Success("Activity berhasil dibuat", data))
 }
 
+// @Summary      List aktivitas by lead
+// @Tags         Activities
+// @Produce      json
+// @Security     BearerAuth
+// @Param        lead_id path string true "Lead ID"
+// @Param        page query int false "Halaman" default(1)
+// @Param        limit query int false "Limit per halaman" default(10)
+// @Success      200 {object} response.PaginatedResponse
+// @Failure      400 {object} response.Response
+// @Router       /activities/{lead_id} [get]
 func (h *ActivityHandler) GetActivities(c *gin.Context) {
 	leadId := c.Param("lead_id")
 	if leadId == "" {
@@ -71,6 +90,15 @@ func (h *ActivityHandler) GetActivities(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Paginated(data, int64(total), page, limit))
 }
 
+// @Summary      Upload file attachment
+// @Tags         Activities
+// @Accept       multipart/form-data
+// @Produce      json
+// @Security     BearerAuth
+// @Param        file formData file true "File (maks 1MB)"
+// @Success      200 {object} response.Response
+// @Failure      400 {object} response.Response
+// @Router       /upload [post]
 func (h *ActivityHandler) UploadFile(c *gin.Context) {
 	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, MaxUploadSize)
 	if err := c.Request.ParseMultipartForm(MaxUploadSize); err != nil {
@@ -98,6 +126,16 @@ func (h *ActivityHandler) UploadFile(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Upload berhasil", gin.H{"url": "/uploads/" + newFileName}))
 }
 
+// @Summary      Update aktivitas
+// @Tags         Activities
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Activity ID"
+// @Param        body body UpdateActivityRequest true "Data update aktivitas"
+// @Success      200 {object} response.Response
+// @Failure      400 {object} response.Response
+// @Router       /activities/{id} [put]
 func (h *ActivityHandler) UpdateActivity(c *gin.Context) {
 	activityID := c.Param("id")
 	if activityID == "" {
@@ -123,6 +161,14 @@ func (h *ActivityHandler) UpdateActivity(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Aktivitas berhasil diupdate", gin.H{"id": activityID, "notes": req.Notes}))
 }
 
+// @Summary      Hapus aktivitas
+// @Tags         Activities
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Activity ID"
+// @Success      200 {object} response.Response
+// @Failure      400 {object} response.Response
+// @Router       /activities/{id} [delete]
 func (h *ActivityHandler) DeleteActivity(c *gin.Context) {
 	activityID := c.Param("id")
 	if activityID == "" {

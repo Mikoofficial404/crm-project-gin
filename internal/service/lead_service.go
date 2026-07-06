@@ -347,3 +347,36 @@ func (s *LeadService) GetAgingLeads(userID, role string, days int) ([]entity.Lea
 	s.CheckStaleLeads()
 	return leads, nil
 }
+
+func (s *LeadService) AutoCloseStaleLeads() error {
+	leads, err := s.lead.GetLeadsWithNoActivity(90)
+	if err != nil {
+		return err
+	}
+	for _, lead := range leads {
+		err := s.lead.UpdateStatus(lead.ID, "CLOSED")
+		if err != nil {
+			return err
+		}
+		message := fmt.Sprintf("Lead '%s' telah otomatis ditutup karena tidak ada aktivitas selama 90 hari.", lead.Name)
+		websocket.SendMessageToUser(lead.AssignedTo, message)
+
+		assignedToUUID, err := uuid.Parse(lead.AssignedTo)
+		if err == nil {
+			notif := &entity.Notification{
+				UserID:  assignedToUUID,
+				Title:   "Lead Ditutup Otomatis",
+				Message: message,
+			}
+			s.notifRepo.CreateNotification(notif)
+		}
+		s.AuditLog.CreateAuditLog(&entity.AuditLog{
+			UserIDAudit: lead.AssignedTo,
+			Action:      "AUTO_CLOSE",
+			TargetID:    lead.ID,
+			OldData:     `{"status": "OPEN"}`,
+			NewData:     `{"status": "CLOSED"}`,
+		})
+	}
+	return nil
+}

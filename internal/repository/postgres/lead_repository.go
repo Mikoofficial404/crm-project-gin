@@ -240,3 +240,13 @@ func (r *LeadRepository) GetAgingLeads(userID, role string, days int) ([]entity.
 	}
 	return leads, nil
 }
+
+func (r *LeadRepository) GetLeadsWithNoActivity(days int) ([]entity.Lead, error) {
+	ctx := context.Background()
+	var leads []entity.Lead
+	err := r.dbGorm.WithContext(ctx).Model(&entity.Lead{}).Where("status NOT IN ? AND NOT EXISTS (SELECT 1 FROM activities WHERE lead_id = leads.id AND activities.deleted_at IS NULL AND activities.created_at > NOW() - (? * INTERVAL '1 day'))", []string{"CLOSED", "WON"}, days).Find(&leads).Error
+	if err != nil {
+		return nil, err
+	}
+	return leads, nil
+}

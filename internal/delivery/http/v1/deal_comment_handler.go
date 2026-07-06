@@ -22,6 +22,16 @@ type AddCommentRequest struct {
 	MentionedUserIDs []string `json:"mentioned_user_ids"`
 }
 
+// @Summary      Tambah komentar ke deal
+// @Tags         Deal Comments
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Deal ID"
+// @Param        body body AddCommentRequest true "Data komentar"
+// @Success      201 {object} response.Response
+// @Failure      400 {object} response.Response
+// @Router       /deals/{id}/comments [post]
 func (h *DealCommentHandler) AddComment(c *gin.Context) {
 	dealID := c.Param("id")
 	userID := c.MustGet("user_id").(string)
@@ -40,6 +50,16 @@ func (h *DealCommentHandler) AddComment(c *gin.Context) {
 	c.JSON(http.StatusCreated, response.Success("Komentar berhasil ditambahkan", nil))
 }
 
+// @Summary      List komentar deal
+// @Tags         Deal Comments
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Deal ID"
+// @Param        page query int false "Halaman" default(1)
+// @Param        limit query int false "Limit per halaman" default(10)
+// @Success      200 {object} response.PaginatedResponse
+// @Failure      500 {object} response.Response
+// @Router       /deals/{id}/comments [get]
 func (h *DealCommentHandler) GetComments(c *gin.Context) {
 	dealID := c.Param("id")
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -53,6 +73,15 @@ func (h *DealCommentHandler) GetComments(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Paginated(comments, total, page, limit))
 }
 
+// @Summary      Hapus komentar deal
+// @Tags         Deal Comments
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Deal ID"
+// @Param        commentId path string true "Comment ID"
+// @Success      200 {object} response.Response
+// @Failure      400 {object} response.Response
+// @Router       /deals/{id}/comments/{commentId} [delete]
 func (h *DealCommentHandler) DeleteComment(c *gin.Context) {
 	commentID := c.Param("commentId")
 

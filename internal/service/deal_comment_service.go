@@ -1,10 +1,12 @@
 package service
 
 import (
+	"crm-project/internal/delivery/websocket"
 	"crm-project/internal/models/entity"
 	"crm-project/internal/repository/postgres"
 	"encoding/json"
 	"errors"
+	"fmt"
 )
 
 type DealCommentService struct {
@@ -44,6 +46,8 @@ func (s *DealCommentService) AddComment(dealID, userID, content string, mentione
 			"Kamu di-mention di sebuah komentar",
 			content,
 		)
+		message := fmt.Sprintf("Kamu di-mention di komentar deal oleh %s: %s", userID, content)
+		websocket.SendMessageToUser(mentionedUserID, message)
 	}
 
 	return nil

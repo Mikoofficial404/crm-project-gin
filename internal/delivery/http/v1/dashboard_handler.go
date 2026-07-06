@@ -18,6 +18,13 @@ func NewDashboardHandler(dashboardService *service.DashboardService) *DashboardH
 	}
 }
 
+// @Summary      Get statistik dashboard
+// @Tags         Dashboard
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200 {object} response.Response
+// @Failure      500 {object} response.Response
+// @Router       /dashboard [get]
 func (h *DashboardHandler) GetDashboardStats(c *gin.Context) {
 	stats, err := h.dashboardService.GetStats()
 	if err != nil {
@@ -27,6 +34,13 @@ func (h *DashboardHandler) GetDashboardStats(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil data dashboard", stats))
 }
 
+// @Summary      Get analytics forecasting
+// @Tags         Dashboard
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200 {object} response.Response
+// @Failure      500 {object} response.Response
+// @Router       /analytics/forecasting [get]
 func (h *DashboardHandler) GetAnalytics(c *gin.Context) {
 	data, err := h.dashboardService.GetForecastingAnalytics()
 	if err != nil {

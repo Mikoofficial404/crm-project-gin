@@ -27,9 +27,41 @@ services:
     networks:
       - crm-network
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: crm_prometheus
+    restart: always
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - crm-prometheus-data:/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - crm-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: crm_grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+    volumes:
+      - crm-grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - crm-network
+
 volumes:
   crm-pg-data:
   crm-redis-data:
+  crm-prometheus-data:
+  crm-grafana-data:
 
 networks:
   crm-network:

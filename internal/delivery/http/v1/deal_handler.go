@@ -50,6 +50,17 @@ func NewDealHandler(dealService *service.DealService) *DealHandler {
 	return &DealHandler{dealService: dealService}
 }
 
+// Reorder godoc
+// @Summary     Reorder deals
+// @Description Ubah urutan deals di kanban board
+// @Tags        deals
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       body body ReorderRequest true "Urutan deal ID"
+// @Success     200 {object} response.Response
+// @Failure     500 {object} response.Response
+// @Router      /deals/reorder [patch]
 func (h *DealHandler) Reorder(c *gin.Context) {
 	var req ReorderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -63,6 +74,17 @@ func (h *DealHandler) Reorder(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Reorder berhasil", nil))
 }
 
+// CreateDeal godoc
+// @Summary     Buat deal baru
+// @Description Buat deal baru ke dalam pipeline
+// @Tags        deals
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       body body CreateDealRequest true "Data deal"
+// @Success     201 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /deals [post]
 func (h *DealHandler) CreateDeal(c *gin.Context) {
 	var req CreateDealRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -78,6 +100,22 @@ func (h *DealHandler) CreateDeal(c *gin.Context) {
 	c.JSON(http.StatusCreated, response.Success("Deal berhasil dibuat", data))
 }
 
+// GetDeals godoc
+// @Summary     List deals
+// @Description Ambil daftar deals dengan filter dan pagination
+// @Tags        deals
+// @Security    BearerAuth
+// @Produce     json
+// @Param       page        query int    false "Halaman (default 1)"
+// @Param       limit       query int    false "Jumlah per halaman (default 10)"
+// @Param       search      query string false "Kata kunci pencarian"
+// @Param       stage_id    query string false "Filter stage ID"
+// @Param       pipeline_id query string false "Filter pipeline ID"
+// @Param       start_date  query string false "Filter dari tanggal (YYYY-MM-DD)"
+// @Param       end_date    query string false "Filter sampai tanggal (YYYY-MM-DD)"
+// @Success     200 {object} response.PaginatedResponse
+// @Failure     400 {object} response.Response
+// @Router      /deals [get]
 func (h *DealHandler) GetDeals(c *gin.Context) {
 	userId := c.MustGet("user_id").(string)
 	role := c.MustGet("role").(string)
@@ -104,6 +142,18 @@ func (h *DealHandler) GetDeals(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Paginated(data, total, page, limit))
 }
 
+// UpdateStage godoc
+// @Summary     Update stage deal
+// @Description Pindahkan deal ke stage yang berbeda
+// @Tags        deals
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       id   path string           true "Deal ID"
+// @Param       body body UpdateStageRequest true "Stage ID baru"
+// @Success     202 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /deals/{id}/stage [patch]
 func (h *DealHandler) UpdateStage(c *gin.Context) {
 	dealID := c.Param("id")
 	if dealID == "" {
@@ -127,6 +177,16 @@ func (h *DealHandler) UpdateStage(c *gin.Context) {
 	c.JSON(http.StatusAccepted, response.Success("Stage deal berhasil diupdate", gin.H{"id": dealID, "stage_id": req.StageID}))
 }
 
+// DeleteDeal godoc
+// @Summary     Hapus deal
+// @Description Soft delete deal berdasarkan ID
+// @Tags        deals
+// @Security    BearerAuth
+// @Produce     json
+// @Param       id path string true "Deal ID"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /deals/{id} [delete]
 func (h *DealHandler) DeleteDeal(c *gin.Context) {
 	dealID := c.Param("id")
 	if dealID == "" {
@@ -144,6 +204,15 @@ func (h *DealHandler) DeleteDeal(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Deal berhasil dihapus", gin.H{"id": dealID}))
 }
 
+// ExportCSC godoc
+// @Summary     Export deals ke CSV
+// @Description Download laporan deals dalam format CSV
+// @Tags        deals
+// @Security    BearerAuth
+// @Produce     text/csv
+// @Success     200
+// @Failure     400 {object} response.Response
+// @Router      /deals/export [get]
 func (h *DealHandler) ExportCSC(c *gin.Context) {
 	c.Header("Content-Type", "text/csv")
 	c.Header("Content-Disposition", "attachment;filename=laporan_deals.csv")
@@ -164,6 +233,15 @@ func (h *DealHandler) ExportCSC(c *gin.Context) {
 	writer.Flush()
 }
 
+// ExportPDF godoc
+// @Summary     Export deals ke PDF
+// @Description Download laporan deals dalam format PDF
+// @Tags        deals
+// @Security    BearerAuth
+// @Produce     application/pdf
+// @Success     200
+// @Failure     500 {object} response.Response
+// @Router      /deals/export/pdf [get]
 func (h *DealHandler) ExportPDF(c *gin.Context) {
 	dataByte, err := h.dealService.ExportDealsToPDF()
 	if err != nil {
@@ -175,6 +253,16 @@ func (h *DealHandler) ExportPDF(c *gin.Context) {
 	c.Data(http.StatusOK, "application/pdf", dataByte)
 }
 
+// DownloadInvoice godoc
+// @Summary     Download invoice PDF
+// @Description Download invoice dalam format PDF berdasarkan Deal ID
+// @Tags        deals
+// @Security    BearerAuth
+// @Produce     application/pdf
+// @Param       id path string true "Deal ID"
+// @Success     200
+// @Failure     500 {object} response.Response
+// @Router      /deals/{id}/invoice [get]
 func (h *DealHandler) DownloadInvoice(c *gin.Context) {
 	dealID := c.Param("id")
 	dataByte, err := h.dealService.GenerateInvoicePDF(dealID)
@@ -187,6 +275,15 @@ func (h *DealHandler) DownloadInvoice(c *gin.Context) {
 	c.Data(http.StatusOK, "application/pdf", dataByte)
 }
 
+// ExportExcel godoc
+// @Summary     Export deals ke Excel
+// @Description Download laporan deals dalam format Excel
+// @Tags        deals
+// @Security    BearerAuth
+// @Produce     application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+// @Success     200
+// @Failure     500 {object} response.Response
+// @Router      /deals/export/excel [get]
 func (h *DealHandler) ExportExcel(c *gin.Context) {
 	fileBuffer, err := h.dealService.ExportDealsToExcel()
 	if err != nil {
@@ -198,6 +295,18 @@ func (h *DealHandler) ExportExcel(c *gin.Context) {
 	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileBuffer.Bytes())
 }
 
+// UpdateDeal godoc
+// @Summary     Update deal
+// @Description Update nama dan nilai deal
+// @Tags        deals
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       id   path string          true "Deal ID"
+// @Param       body body UpdateDealRequest true "Data deal yang diupdate"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /deals/{id} [put]
 func (h *DealHandler) UpdateDeal(c *gin.Context) {
 	dealID := c.Param("id")
 	if dealID == "" {
@@ -221,6 +330,18 @@ func (h *DealHandler) UpdateDeal(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Update deal berhasil", gin.H{"id": dealID, "name": req.Name, "value": req.Value}))
 }
 
+// UpdateInvoiceStatus godoc
+// @Summary     Update status invoice
+// @Description Update status invoice (PAID/OVERDUE)
+// @Tags        deals
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       id   path string                   true "Invoice ID"
+// @Param       body body UpdateInvoiceStatusRequest true "Status baru"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /invoices/{id}/status [patch]
 func (h *DealHandler) UpdateInvoiceStatus(c *gin.Context) {
 	invoiceID := c.Param("id")
 	if invoiceID == "" {
@@ -241,6 +362,18 @@ func (h *DealHandler) UpdateInvoiceStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Status invoice berhasil diupdate", gin.H{"id": invoiceID, "status": req.Status}))
 }
 
+// AssignProduct godoc
+// @Summary     Assign produk ke deal
+// @Description Tambahkan produk ke dalam deal
+// @Tags        deals
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       id   path string             true "Deal ID"
+// @Param       body body AssignProductRequest true "Data produk"
+// @Success     201 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /deals/{id}/products [post]
 func (h *DealHandler) AssignProduct(c *gin.Context) {
 	dealID := c.Param("id")
 	userID := c.MustGet("user_id").(string)
@@ -260,6 +393,17 @@ func (h *DealHandler) AssignProduct(c *gin.Context) {
 	c.JSON(http.StatusCreated, response.Success("Produk berhasil ditambahkan ke deal", result))
 }
 
+// RemoveProduct godoc
+// @Summary     Hapus produk dari deal
+// @Description Hapus produk yang di-assign ke deal
+// @Tags        deals
+// @Security    BearerAuth
+// @Produce     json
+// @Param       id        path string true "Deal ID"
+// @Param       productId path string true "Product ID"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /deals/{id}/products/{productId} [delete]
 func (h *DealHandler) RemoveProduct(c *gin.Context) {
 	dealID := c.Param("id")
 	productID := c.Param("productId")
@@ -273,6 +417,15 @@ func (h *DealHandler) RemoveProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Produk berhasil dihapus dari deal", nil))
 }
 
+// GetTrashedDeals godoc
+// @Summary     Deals yang dihapus
+// @Description Ambil daftar deal yang sudah di-soft delete
+// @Tags        deals
+// @Security    BearerAuth
+// @Produce     json
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /deals/trash [get]
 func (h *DealHandler) GetTrashedDeals(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
 	role := c.MustGet("role").(string)
@@ -285,6 +438,16 @@ func (h *DealHandler) GetTrashedDeals(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil deals yang dihapus", deals))
 }
 
+// RestoreDeal godoc
+// @Summary     Restore deal
+// @Description Restore deal yang sudah di-soft delete
+// @Tags        deals
+// @Security    BearerAuth
+// @Produce     json
+// @Param       id path string true "Deal ID"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /deals/{id}/restore [post]
 func (h *DealHandler) RestoreDeal(c *gin.Context) {
 	dealID := c.Param("id")
 
@@ -295,6 +458,16 @@ func (h *DealHandler) RestoreDeal(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Berhasil mengembalikan deal", nil))
 }
 
+// GetDealProducts godoc
+// @Summary     List produk deal
+// @Description Ambil semua produk yang di-assign ke deal
+// @Tags        deals
+// @Security    BearerAuth
+// @Produce     json
+// @Param       id path string true "Deal ID"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /deals/{id}/products [get]
 func (h *DealHandler) GetDealProducts(c *gin.Context) {
 	dealID := c.Param("id")
 
@@ -306,6 +479,16 @@ func (h *DealHandler) GetDealProducts(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil produk deal", products))
 }
 
+// GetDealHistory godoc
+// @Summary     History perubahan deal
+// @Description Ambil log semua perubahan yang terjadi pada deal
+// @Tags        deals
+// @Security    BearerAuth
+// @Produce     json
+// @Param       id path string true "Deal ID"
+// @Success     200 {object} response.Response
+// @Failure     500 {object} response.Response
+// @Router      /deals/{id}/history [get]
 func (h *DealHandler) GetDealHistory(c *gin.Context) {
 	dealID := c.Param("id")
 

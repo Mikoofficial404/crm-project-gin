@@ -32,6 +32,15 @@ type UpdateProductRequest struct {
 	IsActive    *bool    `json:"is_active,omitempty"`
 }
 
+// @Summary      Buat produk baru
+// @Tags         Products
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body body CreateProductRequest true "Data produk"
+// @Success      201 {object} response.Response
+// @Failure      400 {object} response.Response
+// @Router       /products [post]
 func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	var req CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -46,6 +55,14 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	c.JSON(http.StatusCreated, response.Success("Produk berhasil dibuat", product))
 }
 
+// @Summary      List semua produk
+// @Tags         Products
+// @Produce      json
+// @Security     BearerAuth
+// @Param        active query bool false "Filter produk aktif saja" default(true)
+// @Success      200 {object} response.Response
+// @Failure      500 {object} response.Response
+// @Router       /products [get]
 func (h *ProductHandler) GetAllProducts(c *gin.Context) {
 	onlyActive := true
 	if activeStr := c.Query("active"); activeStr != "" {
@@ -61,6 +78,14 @@ func (h *ProductHandler) GetAllProducts(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil daftar produk", products))
 }
 
+// @Summary      Detail produk
+// @Tags         Products
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Product ID"
+// @Success      200 {object} response.Response
+// @Failure      404 {object} response.Response
+// @Router       /products/{id} [get]
 func (h *ProductHandler) GetProductByID(c *gin.Context) {
 	product, err := h.productService.GetProductByID(c.Param("id"))
 	if err != nil {
@@ -74,6 +99,16 @@ func (h *ProductHandler) GetProductByID(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil produk", product))
 }
 
+// @Summary      Update produk
+// @Tags         Products
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Product ID"
+// @Param        body body UpdateProductRequest true "Data update produk"
+// @Success      200 {object} response.Response
+// @Failure      400 {object} response.Response
+// @Router       /products/{id} [patch]
 func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	var req UpdateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -92,6 +127,14 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Produk berhasil diupdate", nil))
 }
 
+// @Summary      Hapus produk
+// @Tags         Products
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id path string true "Product ID"
+// @Success      200 {object} response.Response
+// @Failure      404 {object} response.Response
+// @Router       /products/{id} [delete]
 func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 	err := h.productService.DeleteProduct(c.Param("id"))
 	if err != nil {

@@ -15,6 +15,7 @@ type Campaign struct {
 	ScheduledAt *time.Time `json:"scheduled_at,omitempty"`
 	SentAt      *time.Time `json:"sent_at,omitempty"`
 	CreatedBy   string     `json:"created_by" gorm:"type:uuid;not null"`
+	Channel     string     `json:"channel" gorm:"type:varchar(20);not null;default:'email'"`
 
 	// Relasi
 	CreatedByUser User                `json:"createdByUser,omitempty" gorm:"foreignKey:CreatedBy"`
@@ -35,6 +36,7 @@ type CampaignRecipient struct {
 	Status     string     `json:"status" gorm:"type:varchar(20);not null;default:'PENDING'"`
 	SentAt     *time.Time `json:"sentAt,omitempty"`
 	ErrorMsg   *string    `json:"errorMsg,omitempty" gorm:"type:text"`
+	Phone      string     `json:"phone" gorm:"type:varchar(20);not null;default:''"`
 
 	// Relasi
 	Campaign Campaign `json:"campaign,omitempty" gorm:"foreignKey:CampaignID"`

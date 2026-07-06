@@ -1,0 +1,3311 @@
+basePath: /api/v1
+definitions:
+  entity.StageOrder:
+    properties:
+      order:
+        type: integer
+      stage_id:
+        type: string
+    type: object
+  response.Meta:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+    type: object
+  response.PaginatedResponse:
+    properties:
+      data: {}
+      message:
+        type: string
+      meta:
+        $ref: '#/definitions/response.Meta'
+      success:
+        type: boolean
+    type: object
+  response.Response:
+    properties:
+      data: {}
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  v1.AddCommentRequest:
+    properties:
+      content:
+        type: string
+      mentioned_user_ids:
+        items:
+          type: string
+        type: array
+    required:
+    - content
+    type: object
+  v1.AddMemberRequest:
+    properties:
+      user_id:
+        type: string
+    required:
+    - user_id
+    type: object
+  v1.AddRecipientsRequest:
+    properties:
+      ids:
+        items:
+          type: string
+        minItems: 1
+        type: array
+      type:
+        enum:
+        - leads
+        - contacts
+        type: string
+    required:
+    - ids
+    - type
+    type: object
+  v1.AssignProductRequest:
+    properties:
+      product_id:
+        type: string
+      quantity:
+        minimum: 1
+        type: integer
+      unit_price:
+        minimum: 0
+        type: number
+    required:
+    - product_id
+    - quantity
+    - unit_price
+    type: object
+  v1.CreateActivity:
+    properties:
+      attachment:
+        type: string
+      leadID:
+        type: string
+      notes:
+        type: string
+      type:
+        type: string
+    required:
+    - leadID
+    - notes
+    - type
+    type: object
+  v1.CreateCampaignRequest:
+    properties:
+      body:
+        type: string
+      name:
+        type: string
+      subject:
+        type: string
+    required:
+    - body
+    - name
+    - subject
+    type: object
+  v1.CreateContactRequest:
+    properties:
+      company:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      position:
+        type: string
+    required:
+    - name
+    - phone
+    type: object
+  v1.CreateDealRequest:
+    properties:
+      leadId:
+        type: string
+      name:
+        type: string
+      pipelineId:
+        type: string
+      stageId:
+        type: string
+      value:
+        type: number
+    required:
+    - leadId
+    - name
+    - pipelineId
+    - stageId
+    - value
+    type: object
+  v1.CreateLeadRequest:
+    properties:
+      custom_fields:
+        additionalProperties: true
+        type: object
+      email:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+    required:
+    - custom_fields
+    - email
+    - name
+    - phone
+    type: object
+  v1.CreatePipelineRequest:
+    properties:
+      description:
+        type: string
+      is_default:
+        type: boolean
+      name:
+        type: string
+    required:
+    - name
+    type: object
+  v1.CreateProductRequest:
+    properties:
+      description:
+        type: string
+      name:
+        type: string
+      price:
+        minimum: 0
+        type: number
+      unit:
+        type: string
+    required:
+    - name
+    - price
+    type: object
+  v1.CreateStageRequest:
+    properties:
+      color:
+        type: string
+      is_closed_lost:
+        type: boolean
+      is_closed_won:
+        type: boolean
+      name:
+        type: string
+      probability:
+        type: integer
+    required:
+    - name
+    type: object
+  v1.CreateTaskRequest:
+    properties:
+      category:
+        type: string
+      description:
+        type: string
+      due_date:
+        type: string
+      lead_id:
+        type: string
+      priority:
+        type: string
+      title:
+        type: string
+    required:
+    - title
+    type: object
+  v1.CreateTeamRequest:
+    properties:
+      description:
+        type: string
+      manager_id:
+        type: string
+      name:
+        type: string
+    required:
+    - manager_id
+    - name
+    type: object
+  v1.ForgetPasswordRequest:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  v1.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        minLength: 6
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  v1.RegisterRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        minLength: 6
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
+  v1.ReorderRequest:
+    properties:
+      deal_ids:
+        items:
+          type: string
+        type: array
+    required:
+    - deal_ids
+    type: object
+  v1.ReorderStagesRequest:
+    properties:
+      stages:
+        items:
+          $ref: '#/definitions/entity.StageOrder'
+        type: array
+    required:
+    - stages
+    type: object
+  v1.ResetPasswordRequest:
+    properties:
+      new_password:
+        type: string
+      token:
+        type: string
+    required:
+    - new_password
+    - token
+    type: object
+  v1.ScheduleCampaignRequest:
+    properties:
+      scheduled_at:
+        type: string
+    required:
+    - scheduled_at
+    type: object
+  v1.SendReplyRequest:
+    properties:
+      message:
+        type: string
+    required:
+    - message
+    type: object
+  v1.UpdateActivityRequest:
+    properties:
+      notes:
+        type: string
+    required:
+    - notes
+    type: object
+  v1.UpdateCampaignRequest:
+    properties:
+      body:
+        type: string
+      name:
+        type: string
+      subject:
+        type: string
+    type: object
+  v1.UpdateContactRequest:
+    properties:
+      assigned_to:
+        type: string
+      company:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+      position:
+        type: string
+    type: object
+  v1.UpdateDealRequest:
+    properties:
+      name:
+        type: string
+      value:
+        type: number
+    required:
+    - name
+    - value
+    type: object
+  v1.UpdateInvoiceStatusRequest:
+    properties:
+      status:
+        type: string
+    required:
+    - status
+    type: object
+  v1.UpdateLeadRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      phone:
+        type: string
+    required:
+    - email
+    - name
+    - phone
+    type: object
+  v1.UpdatePipelineRequest:
+    properties:
+      description:
+        type: string
+      is_active:
+        type: boolean
+      is_default:
+        type: boolean
+      name:
+        type: string
+      probability:
+        type: integer
+    type: object
+  v1.UpdatePipelineStageRequest:
+    properties:
+      color:
+        type: string
+      is_closed_lost:
+        type: boolean
+      is_closed_won:
+        type: boolean
+      name:
+        type: string
+      probability:
+        type: integer
+    type: object
+  v1.UpdateProductRequest:
+    properties:
+      description:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      price:
+        type: number
+      unit:
+        type: string
+    type: object
+  v1.UpdateStageRequest:
+    properties:
+      stage_id:
+        type: string
+    required:
+    - stage_id
+    type: object
+  v1.UpdateStatusReques:
+    properties:
+      status:
+        type: string
+    required:
+    - status
+    type: object
+  v1.UpdateTaskRequest:
+    properties:
+      category:
+        type: string
+      description:
+        type: string
+      due_date:
+        type: string
+      priority:
+        type: string
+      title:
+        type: string
+    required:
+    - title
+    type: object
+  v1.UpdateTeamRequest:
+    properties:
+      description:
+        type: string
+      manager_id:
+        type: string
+      name:
+        type: string
+    type: object
+  v1.VerifyOTPRequest:
+    properties:
+      otp_code:
+        type: string
+      user_id:
+        type: string
+    required:
+    - otp_code
+    - user_id
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@crm.com
+    name: CRM Support
+  description: API untuk sistem CRM (Customer Relationship Management)
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: CRM Project API
+  version: "1.0"
+paths:
+  /activities:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Data aktivitas
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.CreateActivity'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Buat aktivitas baru
+      tags:
+      - Activities
+  /activities/{id}:
+    delete:
+      parameters:
+      - description: Activity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Hapus aktivitas
+      tags:
+      - Activities
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Activity ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data update aktivitas
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.UpdateActivityRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Update aktivitas
+      tags:
+      - Activities
+  /activities/{lead_id}:
+    get:
+      parameters:
+      - description: Lead ID
+        in: path
+        name: lead_id
+        required: true
+        type: string
+      - default: 1
+        description: Halaman
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Limit per halaman
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.PaginatedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: List aktivitas by lead
+      tags:
+      - Activities
+  /admin/users:
+    get:
+      description: Ambil daftar semua user (admin only)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Get semua users
+      tags:
+      - admin
+  /analytics/forecasting:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Get analytics forecasting
+      tags:
+      - Dashboard
+  /auth/forgot-password:
+    post:
+      consumes:
+      - application/json
+      description: Kirim email reset password
+      parameters:
+      - description: Email user
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.ForgetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Lupa password
+      tags:
+      - auth
+  /auth/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: Reset password dengan token dari email
+      parameters:
+      - description: Token dan password baru
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.ResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Reset password
+      tags:
+      - auth
+  /campaigns:
+    get:
+      description: Ambil semua campaign email (admin only)
+      parameters:
+      - description: Filter status (DRAFT/SCHEDULED/SENDING/SENT)
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Daftar campaign
+      tags:
+      - campaigns
+    post:
+      consumes:
+      - application/json
+      description: Buat campaign email baru (admin only)
+      parameters:
+      - description: Data campaign
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.CreateCampaignRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Buat campaign email
+      tags:
+      - campaigns
+  /campaigns/{id}:
+    delete:
+      description: Hapus campaign (hanya DRAFT, admin only)
+      parameters:
+      - description: Campaign ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Hapus campaign
+      tags:
+      - campaigns
+    get:
+      description: Ambil detail campaign berdasarkan ID (admin only)
+      parameters:
+      - description: Campaign ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Detail campaign
+      tags:
+      - campaigns
+    patch:
+      consumes:
+      - application/json
+      description: Update data campaign (hanya DRAFT, admin only)
+      parameters:
+      - description: Campaign ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data update campaign
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.UpdateCampaignRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Update campaign
+      tags:
+      - campaigns
+  /campaigns/{id}/recipients:
+    get:
+      description: Ambil daftar penerima campaign dengan pagination (admin only)
+      parameters:
+      - description: Campaign ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 'Halaman (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Jumlah per halaman (default: 20, max: 100)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.PaginatedResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: List penerima campaign
+      tags:
+      - campaigns
+    post:
+      consumes:
+      - application/json
+      description: Tambah leads atau contacts sebagai penerima campaign (admin only)
+      parameters:
+      - description: Campaign ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data penerima
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.AddRecipientsRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Tambah penerima campaign
+      tags:
+      - campaigns
+  /campaigns/{id}/schedule:
+    post:
+      consumes:
+      - application/json
+      description: Jadwalkan campaign email untuk dikirim di waktu tertentu (admin
+        only)
+      parameters:
+      - description: Campaign ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Waktu jadwal (RFC3339)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.ScheduleCampaignRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Jadwalkan campaign
+      tags:
+      - campaigns
+  /campaigns/{id}/send:
+    post:
+      description: Kirim campaign email ke semua penerima (admin only)
+      parameters:
+      - description: Campaign ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Kirim campaign
+      tags:
+      - campaigns
+  /campaigns/{id}/stats:
+    get:
+      description: Ambil statistik pengiriman campaign (total, terkirim, gagal, pending)
+        (admin only)
+      parameters:
+      - description: Campaign ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Statistik campaign
+      tags:
+      - campaigns
+  /contacts:
+    get:
+      description: Ambil daftar contacts dengan filter dan pagination
+      parameters:
+      - description: Halaman (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Jumlah per halaman (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Kata kunci pencarian
+        in: query
+        name: search
+        type: string
+      - description: Filter source (whatsapp/manual)
+        in: query
+        name: source
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.PaginatedResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: List contacts
+      tags:
+      - contacts
+    post:
+      consumes:
+      - application/json
+      description: Buat contact baru ke sistem
+      parameters:
+      - description: Data contact
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.CreateContactRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Buat contact baru
+      tags:
+      - contacts
+  /contacts/{id}:
+    delete:
+      description: Soft delete contact berdasarkan ID
+      parameters:
+      - description: Contact ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Hapus contact
+      tags:
+      - contacts
+    get:
+      description: Ambil detail contact berdasarkan ID
+      parameters:
+      - description: Contact ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Detail contact
+      tags:
+      - contacts
+    patch:
+      consumes:
+      - application/json
+      description: Update data contact secara partial
+      parameters:
+      - description: Contact ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data yang diupdate
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.UpdateContactRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Update contact
+      tags:
+      - contacts
+  /contacts/{id}/restore:
+    patch:
+      description: Restore contact yang sudah di-soft delete
+      parameters:
+      - description: Contact ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Restore contact
+      tags:
+      - contacts
+  /contacts/export:
+    get:
+      description: Download daftar contacts dalam format CSV
+      parameters:
+      - description: Filter source (whatsapp/manual)
+        in: query
+        name: source
+        type: string
+      produces:
+      - text/csv
+      responses:
+        "200":
+          description: OK
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Export contacts ke CSV
+      tags:
+      - contacts
+  /contacts/import:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload file CSV untuk import contacts secara massal
+      parameters:
+      - description: File CSV
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Import contacts dari CSV
+      tags:
+      - contacts
+  /contacts/trash:
+    get:
+      description: Ambil daftar contact yang sudah di-soft delete
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Contacts yang dihapus
+      tags:
+      - contacts
+  /dashboard:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Get statistik dashboard
+      tags:
+      - Dashboard
+  /deals:
+    get:
+      description: Ambil daftar deals dengan filter dan pagination
+      parameters:
+      - description: Halaman (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Jumlah per halaman (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Kata kunci pencarian
+        in: query
+        name: search
+        type: string
+      - description: Filter stage ID
+        in: query
+        name: stage_id
+        type: string
+      - description: Filter pipeline ID
+        in: query
+        name: pipeline_id
+        type: string
+      - description: Filter dari tanggal (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: Filter sampai tanggal (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.PaginatedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: List deals
+      tags:
+      - deals
+    post:
+      consumes:
+      - application/json
+      description: Buat deal baru ke dalam pipeline
+      parameters:
+      - description: Data deal
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.CreateDealRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Buat deal baru
+      tags:
+      - deals
+  /deals/{id}:
+    delete:
+      description: Soft delete deal berdasarkan ID
+      parameters:
+      - description: Deal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Hapus deal
+      tags:
+      - deals
+    put:
+      consumes:
+      - application/json
+      description: Update nama dan nilai deal
+      parameters:
+      - description: Deal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data deal yang diupdate
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.UpdateDealRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Update deal
+      tags:
+      - deals
+  /deals/{id}/comments:
+    get:
+      parameters:
+      - description: Deal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - default: 1
+        description: Halaman
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Limit per halaman
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.PaginatedResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: List komentar deal
+      tags:
+      - Deal Comments
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Deal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data komentar
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.AddCommentRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Tambah komentar ke deal
+      tags:
+      - Deal Comments
+  /deals/{id}/comments/{commentId}:
+    delete:
+      parameters:
+      - description: Deal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Comment ID
+        in: path
+        name: commentId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Hapus komentar deal
+      tags:
+      - Deal Comments
+  /deals/{id}/history:
+    get:
+      description: Ambil log semua perubahan yang terjadi pada deal
+      parameters:
+      - description: Deal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: History perubahan deal
+      tags:
+      - deals
+  /deals/{id}/invoice:
+    get:
+      description: Download invoice dalam format PDF berdasarkan Deal ID
+      parameters:
+      - description: Deal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/pdf
+      responses:
+        "200":
+          description: OK
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Download invoice PDF
+      tags:
+      - deals
+  /deals/{id}/products:
+    get:
+      description: Ambil semua produk yang di-assign ke deal
+      parameters:
+      - description: Deal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: List produk deal
+      tags:
+      - deals
+    post:
+      consumes:
+      - application/json
+      description: Tambahkan produk ke dalam deal
+      parameters:
+      - description: Deal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data produk
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.AssignProductRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Assign produk ke deal
+      tags:
+      - deals
+  /deals/{id}/products/{productId}:
+    delete:
+      description: Hapus produk yang di-assign ke deal
+      parameters:
+      - description: Deal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Product ID
+        in: path
+        name: productId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Hapus produk dari deal
+      tags:
+      - deals
+  /deals/{id}/restore:
+    post:
+      description: Restore deal yang sudah di-soft delete
+      parameters:
+      - description: Deal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Restore deal
+      tags:
+      - deals
+  /deals/{id}/stage:
+    patch:
+      consumes:
+      - application/json
+      description: Pindahkan deal ke stage yang berbeda
+      parameters:
+      - description: Deal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Stage ID baru
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.UpdateStageRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Update stage deal
+      tags:
+      - deals
+  /deals/export:
+    get:
+      description: Download laporan deals dalam format CSV
+      produces:
+      - text/csv
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Export deals ke CSV
+      tags:
+      - deals
+  /deals/export/excel:
+    get:
+      description: Download laporan deals dalam format Excel
+      produces:
+      - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+      responses:
+        "200":
+          description: OK
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Export deals ke Excel
+      tags:
+      - deals
+  /deals/export/pdf:
+    get:
+      description: Download laporan deals dalam format PDF
+      produces:
+      - application/pdf
+      responses:
+        "200":
+          description: OK
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Export deals ke PDF
+      tags:
+      - deals
+  /deals/reorder:
+    patch:
+      consumes:
+      - application/json
+      description: Ubah urutan deals di kanban board
+      parameters:
+      - description: Urutan deal ID
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.ReorderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Reorder deals
+      tags:
+      - deals
+  /deals/trash:
+    get:
+      description: Ambil daftar deal yang sudah di-soft delete
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Deals yang dihapus
+      tags:
+      - deals
+  /invoices/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      description: Update status invoice (PAID/OVERDUE)
+      parameters:
+      - description: Invoice ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Status baru
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.UpdateInvoiceStatusRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Update status invoice
+      tags:
+      - deals
+  /leads:
+    get:
+      description: Ambil daftar leads dengan filter dan pagination
+      parameters:
+      - description: Halaman (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Jumlah per halaman (default 10)
+        in: query
+        name: limit
+        type: integer
+      - description: Kata kunci pencarian
+        in: query
+        name: search
+        type: string
+      - description: Filter status lead
+        in: query
+        name: status
+        type: string
+      - description: Filter dari tanggal (YYYY-MM-DD)
+        in: query
+        name: startDate
+        type: string
+      - description: Filter sampai tanggal (YYYY-MM-DD)
+        in: query
+        name: endDate
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.PaginatedResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: List leads
+      tags:
+      - leads
+    post:
+      consumes:
+      - application/json
+      description: Buat lead baru ke sistem
+      parameters:
+      - description: Data lead
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.CreateLeadRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Buat lead baru
+      tags:
+      - leads
+  /leads/{id}:
+    delete:
+      description: Soft delete lead berdasarkan ID (admin only)
+      parameters:
+      - description: Lead ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Hapus lead
+      tags:
+      - leads
+    get:
+      description: Ambil detail lead berdasarkan ID
+      parameters:
+      - description: Lead ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Detail lead
+      tags:
+      - leads
+    put:
+      consumes:
+      - application/json
+      description: Update nama, email, dan nomor HP lead
+      parameters:
+      - description: Lead ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data lead yang diupdate
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.UpdateLeadRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Update data lead
+      tags:
+      - leads
+  /leads/{id}/reply:
+    post:
+      consumes:
+      - application/json
+      description: Kirim balasan WhatsApp ke lead
+      parameters:
+      - description: Lead ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Pesan balasan
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.SendReplyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Balas pesan WhatsApp
+      tags:
+      - leads
+  /leads/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      description: Update status lead (NEW, CONTACTED, dll)
+      parameters:
+      - description: Lead ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Status baru
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.UpdateStatusReques'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Update status lead
+      tags:
+      - leads
+  /leads/{id}/timeline:
+    get:
+      description: Ambil semua aktivitas, deals, dan tasks dari sebuah lead
+      parameters:
+      - description: Lead ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Timeline aktivitas lead
+      tags:
+      - leads
+  /leads/aging:
+    get:
+      description: Ambil leads yang tidak disentuh lebih dari X hari
+      parameters:
+      - description: Jumlah hari (default 7)
+        in: query
+        name: days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Lead yang sudah lama tidak diupdate
+      tags:
+      - leads
+  /leads/import:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload file CSV untuk import data leads
+      parameters:
+      - description: File CSV
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Import leads dari CSV
+      tags:
+      - leads
+  /leads/trash:
+    get:
+      description: Ambil daftar lead yang sudah di-soft delete
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Lead yang dihapus
+      tags:
+      - leads
+  /leads/trash/{id}/restore:
+    post:
+      description: Pulihkan lead yang sudah dihapus (admin only)
+      parameters:
+      - description: Lead ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Restore lead
+      tags:
+      - leads
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Login dan dapatkan JWT token
+      parameters:
+      - description: Data login
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Login user
+      tags:
+      - auth
+  /login/verify-otp:
+    post:
+      consumes:
+      - application/json
+      description: Verifikasi kode OTP untuk 2FA
+      parameters:
+      - description: UserID dan OTP code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.VerifyOTPRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Verifikasi OTP 2FA
+      tags:
+      - auth
+  /logout:
+    post:
+      description: Logout dan blacklist token JWT
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Logout user
+      tags:
+      - auth
+  /me:
+    get:
+      description: Ambil data profil user yang sedang login
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Get profil user
+      tags:
+      - auth
+  /me/login-history:
+    get:
+      description: Ambil riwayat login user yang sedang login
+      parameters:
+      - description: Jumlah data (default 10)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Riwayat login
+      tags:
+      - auth
+  /notifications:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: List notifikasi yang belum dibaca
+      tags:
+      - Notifications
+  /notifications/{id}/read:
+    patch:
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Tandai notifikasi sudah dibaca
+      tags:
+      - Notifications
+  /notifications/read-all:
+    patch:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Tandai semua notifikasi sudah dibaca
+      tags:
+      - Notifications
+  /pipelines:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: List semua pipeline
+      tags:
+      - Pipelines
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Data pipeline
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.CreatePipelineRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Buat pipeline baru
+      tags:
+      - Pipelines
+  /pipelines/{id}:
+    delete:
+      parameters:
+      - description: Pipeline ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Hapus pipeline
+      tags:
+      - Pipelines
+    get:
+      parameters:
+      - description: Pipeline ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Detail pipeline
+      tags:
+      - Pipelines
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Pipeline ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data update pipeline
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.UpdatePipelineRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Update pipeline
+      tags:
+      - Pipelines
+  /pipelines/{id}/stages:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Pipeline ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data stage
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.CreateStageRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Tambah stage ke pipeline
+      tags:
+      - Pipelines
+  /pipelines/{id}/stages/{stageId}:
+    delete:
+      parameters:
+      - description: Pipeline ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Stage ID
+        in: path
+        name: stageId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Hapus stage
+      tags:
+      - Pipelines
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Pipeline ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Stage ID
+        in: path
+        name: stageId
+        required: true
+        type: string
+      - description: Data update stage
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.UpdatePipelineStageRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Update stage
+      tags:
+      - Pipelines
+  /pipelines/{id}/stages/reorder:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Pipeline ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Urutan stage baru
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.ReorderStagesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Reorder stages
+      tags:
+      - Pipelines
+  /products:
+    get:
+      parameters:
+      - default: true
+        description: Filter produk aktif saja
+        in: query
+        name: active
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: List semua produk
+      tags:
+      - Products
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Data produk
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.CreateProductRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Buat produk baru
+      tags:
+      - Products
+  /products/{id}:
+    delete:
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Hapus produk
+      tags:
+      - Products
+    get:
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Detail produk
+      tags:
+      - Products
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data update produk
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.UpdateProductRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Update produk
+      tags:
+      - Products
+  /profile/2fa/setup:
+    get:
+      description: Setup two-factor authentication
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Setup 2FA
+      tags:
+      - auth
+  /profile/password:
+    patch:
+      consumes:
+      - application/json
+      description: Ganti password user yang sedang login
+      parameters:
+      - description: old_password dan new_password
+        in: body
+        name: body
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Ganti password
+      tags:
+      - auth
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: Daftarkan user baru ke sistem
+      parameters:
+      - description: Data registrasi
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: Register user baru
+      tags:
+      - auth
+  /reports/activity:
+    get:
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Activity report
+      tags:
+      - Reports
+  /reports/lead-source:
+    get:
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Lead source report
+      tags:
+      - Reports
+  /reports/pipeline:
+    get:
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      - description: Pipeline ID
+        in: query
+        name: pipeline_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Pipeline report
+      tags:
+      - Reports
+  /reports/sales-performance:
+    get:
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Sales performance report
+      tags:
+      - Reports
+  /reports/sales-summary:
+    get:
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Sales summary report
+      tags:
+      - Reports
+  /search:
+    get:
+      parameters:
+      - description: Keyword pencarian
+        in: query
+        name: q
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Global search (leads, deals, contacts, users)
+      tags:
+      - Search
+  /tasks:
+    get:
+      parameters:
+      - description: Filter priority (LOW/MEDIUM/HIGH/URGENT)
+        in: query
+        name: priority
+        type: string
+      - description: Filter category (FOLLOW_UP/MEETING/CALL/EMAIL/OTHER)
+        in: query
+        name: category
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: List semua task
+      tags:
+      - Tasks
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Data task
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.CreateTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Buat task baru
+      tags:
+      - Tasks
+  /tasks/{id}:
+    delete:
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Hapus task
+      tags:
+      - Tasks
+    get:
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Get task by ID
+      tags:
+      - Tasks
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data task
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.UpdateTaskRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Update task
+      tags:
+      - Tasks
+  /tasks/{id}/done:
+    patch:
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Tandai task selesai
+      tags:
+      - Tasks
+  /tasks/{id}/restore:
+    post:
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Restore task yang dihapus (admin)
+      tags:
+      - Tasks
+  /tasks/trash:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: List task yang dihapus (admin)
+      tags:
+      - Tasks
+  /teams:
+    get:
+      description: Ambil semua team (admin only)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Daftar semua team
+      tags:
+      - teams
+    post:
+      consumes:
+      - application/json
+      description: Buat team baru (admin only)
+      parameters:
+      - description: Data team
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.CreateTeamRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Buat team baru
+      tags:
+      - teams
+  /teams/{id}:
+    delete:
+      description: Hapus team berdasarkan ID (admin only)
+      parameters:
+      - description: Team ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Hapus team
+      tags:
+      - teams
+    get:
+      description: Ambil detail team berdasarkan ID
+      parameters:
+      - description: Team ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Detail team
+      tags:
+      - teams
+    patch:
+      consumes:
+      - application/json
+      description: Update data team berdasarkan ID (admin only)
+      parameters:
+      - description: Team ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data update team
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.UpdateTeamRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Update team
+      tags:
+      - teams
+  /teams/{id}/members:
+    post:
+      consumes:
+      - application/json
+      description: Tambah user ke dalam team (admin only)
+      parameters:
+      - description: Team ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data member
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/v1.AddMemberRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Tambah member ke team
+      tags:
+      - teams
+  /teams/{id}/members/{userId}:
+    delete:
+      description: Hapus user dari team berdasarkan ID (admin only)
+      parameters:
+      - description: Team ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Hapus member dari team
+      tags:
+      - teams
+  /upload:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: File (maks 1MB)
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - BearerAuth: []
+      summary: Upload file attachment
+      tags:
+      - Activities
+securityDefinitions:
+  BearerAuth:
+    description: 'Masukkan token JWT dengan format: Bearer {token}'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

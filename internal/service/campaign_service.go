@@ -34,15 +34,19 @@ func NewCampaignService(
 	}
 }
 
-func (s *CampaignService) CreateCampaign(name, subject, body, createdBy string) (*entity.Campaign, error) {
+func (s *CampaignService) CreateCampaign(name, subject, body, channel, createdBy string) (*entity.Campaign, error) {
 	if name == "" || subject == "" || body == "" {
 		return nil, errors.New("name, subject, and body are required")
+	}
+	if channel != "email" && channel != "whatsapp" {
+		channel = "email"
 	}
 	campaign := &entity.Campaign{
 		Name:      name,
 		Subject:   subject,
 		Body:      body,
 		Status:    "DRAFT",
+		Channel:   channel,
 		CreatedBy: createdBy,
 	}
 	return s.campaignRepo.CreateCampaign(campaign)
@@ -97,6 +101,7 @@ func (s *CampaignService) AddRecipientsByLeadIDs(campaignID string, leadIDs []st
 	if err != nil {
 		return err
 	}
+
 	if campaign.Status != "DRAFT" {
 		return errors.New("cannot add recipients to a non-DRAFT campaign")
 	}
@@ -107,20 +112,32 @@ func (s *CampaignService) AddRecipientsByLeadIDs(campaignID string, leadIDs []st
 		if err != nil {
 			continue
 		}
-		if lead.Email == "" {
-			continue
-		}
 		lid := leadID
-		recipients = append(recipients, entity.CampaignRecipient{
-			CampaignID: campaignID,
-			LeadID:     &lid,
-			Email:      lead.Email,
-			Status:     "PENDING",
-		})
+		if campaign.Channel == "whatsapp" {
+			if lead.Phone == "" {
+				continue
+			}
+			recipients = append(recipients, entity.CampaignRecipient{
+				CampaignID: campaignID,
+				LeadID:     &lid,
+				Phone:      lead.Phone,
+				Status:     "PENDING",
+			})
+		} else {
+			if lead.Email == "" {
+				continue
+			}
+			recipients = append(recipients, entity.CampaignRecipient{
+				CampaignID: campaignID,
+				LeadID:     &lid,
+				Email:      lead.Email,
+				Status:     "PENDING",
+			})
+		}
 	}
 
 	if len(recipients) == 0 {
-		return errors.New("no valid recipients found (leads must have email addresses)")
+		return errors.New("no valid recipients found")
 	}
 	return s.recipientRepo.BulkInsertRecipients(recipients)
 }
@@ -140,20 +157,32 @@ func (s *CampaignService) AddRecipientsByContactIDs(campaignID string, contactID
 		if err != nil {
 			continue
 		}
-		if contact.Email == nil || *contact.Email == "" {
-			continue
-		}
 		cid := contactID
-		recipients = append(recipients, entity.CampaignRecipient{
-			CampaignID: campaignID,
-			ContactID:  &cid,
-			Email:      *contact.Email,
-			Status:     "PENDING",
-		})
+		if campaign.Channel == "whatsapp" {
+			if contact.Phone == "" {
+				continue
+			}
+			recipients = append(recipients, entity.CampaignRecipient{
+				CampaignID: campaignID,
+				ContactID:  &cid,
+				Phone:      contact.Phone,
+				Status:     "PENDING",
+			})
+		} else {
+			if contact.Email == nil || *contact.Email == "" {
+				continue
+			}
+			recipients = append(recipients, entity.CampaignRecipient{
+				CampaignID: campaignID,
+				ContactID:  &cid,
+				Email:      *contact.Email,
+				Status:     "PENDING",
+			})
+		}
 	}
 
 	if len(recipients) == 0 {
-		return errors.New("no valid recipients found (contacts must have email addresses)")
+		return errors.New("no valid recipients found")
 	}
 	return s.recipientRepo.BulkInsertRecipients(recipients)
 }
@@ -182,7 +211,13 @@ func (s *CampaignService) SendCampaign(campaignID string) error {
 	}
 
 	for _, r := range pending {
-		task, err := worker.NewCampaignEmailTask(campaignID, r.ID, r.Email, campaign.Subject, campaign.Body)
+		var task *asynq.Task
+		var err error
+		if campaign.Channel == "whatsapp" {
+			task, err = worker.NewCampaignWhatsAppTask(campaignID, r.ID, r.Phone, campaign.Body)
+		} else {
+			task, err = worker.NewCampaignEmailTask(campaignID, r.ID, r.Email, campaign.Subject, campaign.Body)
+		}
 		if err != nil {
 			continue
 		}
