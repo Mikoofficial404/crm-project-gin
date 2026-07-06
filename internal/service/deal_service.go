@@ -281,73 +281,117 @@ func (s *DealService) GenerateInvoicePDF(dealID string) ([]byte, error) {
 
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
+	pdf.SetMargins(15, 15, 15)
 
-	pdf.SetFont("Arial", "B", 16)
-	pdf.CellFormat(0, 10, "INVOICE TAGIHAN", "", 1, "C", false, 0, "")
-	pdf.Ln(10)
-
-	pdf.SetFont("Arial", "B", 11)
-	pdf.Cell(60, 10, "Nomor Invoice")
-	pdf.SetFont("Arial", "", 11)
-	pdf.Cell(0, 10, invoice.InvoiceNo)
-	pdf.Ln(8)
-
-	pdf.SetFont("Arial", "B", 11)
-	pdf.Cell(60, 10, "Harga Awal (SubTotal)")
-	pdf.SetFont("Arial", "", 11)
-	pdf.Cell(0, 10, fmt.Sprintf("Rp %.2f", invoice.SubTotal))
-	pdf.Ln(8)
-
-	pdf.SetFont("Arial", "B", 11)
-	pdf.Cell(60, 10, "Pajak PPN (11%)")
-	pdf.SetFont("Arial", "", 11)
-	pdf.Cell(0, 10, fmt.Sprintf("Rp %.2f", invoice.Tax))
-	pdf.Ln(8)
-
-	pdf.SetFont("Arial", "B", 11)
-	pdf.Cell(60, 10, "Grand Total")
-	pdf.SetFont("Arial", "", 11)
-	pdf.Cell(0, 10, fmt.Sprintf("Rp %.2f", invoice.GrandTotal))
-	pdf.Ln(20)
-
-	widths := []float64{80, 20, 45, 45}
-	headers := []string{"Product Name", "Qty", "Unit Price", "Subtotal"}
-
-	pdf.SetFont("Arial", "B", 10)
-	for i, h := range headers {
-		pdf.CellFormat(widths[i], 8, h, "1", 0, "C", false, 0, "")
-	}
-	pdf.Ln(-1)
-
-	var total float64
+	// HEADER
+	pdf.SetFont("Arial", "B", 18)
+	pdf.CellFormat(0, 10, "PT. NAMA PERUSAHAAN", "", 1, "C", false, 0, "")
 	pdf.SetFont("Arial", "", 10)
-	for _, item := range invoice.Items {
-		subtotal := float64(item.Quantity) * item.UnitPrice
-		total += subtotal
+	pdf.CellFormat(0, 6, "Jl. Contoh No. 123, Jakarta | info@perusahaan.com", "", 1, "C", false, 0, "")
+	pdf.Ln(5)
 
-		pdf.CellFormat(widths[0], 8, item.Product.Name, "1", 0, "L", false, 0, "")
-		pdf.CellFormat(widths[1], 8, fmt.Sprintf("%d", item.Quantity), "1", 0, "C", false, 0, "")
-		pdf.CellFormat(widths[2], 8, fmt.Sprintf("Rp %.2f", item.UnitPrice), "1", 0, "R", false, 0, "")
-		pdf.CellFormat(widths[3], 8, fmt.Sprintf("Rp %.2f", subtotal), "1", 0, "R", false, 0, "")
-		pdf.Ln(-1)
-	}
+	pdf.SetDrawColor(200, 200, 200)
+	pdf.Line(15, pdf.GetY(), 195, pdf.GetY())
+	pdf.Ln(5)
+
+	pdf.SetFont("Arial", "B", 14)
+	pdf.CellFormat(0, 10, "INVOICE", "", 1, "C", false, 0, "")
+	pdf.Ln(3)
 
 	pdf.SetFont("Arial", "B", 10)
-	pdf.CellFormat(widths[0]+widths[1]+widths[2], 8, "Total", "1", 0, "R", false, 0, "")
-	pdf.CellFormat(widths[3], 8, fmt.Sprintf("Rp %.2f", total), "1", 0, "R", false, 0, "")
+	pdf.Cell(40, 7, "Nomor Invoice")
+	pdf.SetFont("Arial", "", 10)
+	pdf.Cell(0, 7, ": "+invoice.InvoiceNo)
+	pdf.Ln(7)
+
+	pdf.SetFont("Arial", "B", 10)
+	pdf.Cell(40, 7, "Tanggal")
+	pdf.SetFont("Arial", "", 10)
+	pdf.Cell(0, 7, ": "+invoice.CreatedAt.Format("02 January 2006"))
+	pdf.Ln(12)
+
+	// INFO DEAL
+	pdf.SetFont("Arial", "B", 11)
+	pdf.CellFormat(0, 8, "Detail Deal", "", 1, "L", false, 0, "")
+	pdf.Line(15, pdf.GetY(), 195, pdf.GetY())
+	pdf.Ln(4)
+
+	pdf.SetFont("Arial", "B", 10)
+	pdf.Cell(40, 7, "Nama Deal")
+	pdf.SetFont("Arial", "", 10)
+	pdf.Cell(0, 7, ": "+invoice.Deal.Name)
+	pdf.Ln(7)
+
+	pdf.SetFont("Arial", "B", 10)
+	pdf.Cell(40, 7, "Nama Lead")
+	pdf.SetFont("Arial", "", 10)
+	pdf.Cell(0, 7, ": "+invoice.Deal.Lead.Name)
+	pdf.Ln(12)
+
+	// TABEL PRODUK
+	pdf.SetFont("Arial", "B", 11)
+	pdf.CellFormat(0, 8, "Rincian Produk", "", 1, "L", false, 0, "")
+	pdf.Line(15, pdf.GetY(), 195, pdf.GetY())
+	pdf.Ln(4)
+
+	widths := []float64{10, 75, 25, 40, 40}
+	headers := []string{"No", "Nama Produk", "Qty", "Harga Satuan", "Subtotal"}
+
+	pdf.SetFont("Arial", "B", 10)
+	pdf.SetFillColor(230, 230, 230)
+	for i, h := range headers {
+		pdf.CellFormat(widths[i], 8, h, "1", 0, "C", true, 0, "")
+	}
 	pdf.Ln(-1)
 
-	pdf.Ln(10)
-	pdf.SetFont("Arial", "I", 10)
-	pdf.CellFormat(0, 10, "Harap transfer segera ke Rekening BCA 123456", "", 1, "C", false, 0, "")
+	pdf.SetFont("Arial", "", 10)
+	pdf.SetFillColor(255, 255, 255)
 
-	// Output — harus paling akhir
+	if len(invoice.Items) == 0 {
+		pdf.CellFormat(0, 8, "Tidak ada item produk", "1", 1, "C", false, 0, "")
+	} else {
+		for i, item := range invoice.Items {
+			pdf.CellFormat(widths[0], 8, fmt.Sprintf("%d", i+1), "1", 0, "C", false, 0, "")
+			pdf.CellFormat(widths[1], 8, item.Product.Name, "1", 0, "L", false, 0, "")
+			pdf.CellFormat(widths[2], 8, fmt.Sprintf("%d", item.Quantity), "1", 0, "C", false, 0, "")
+			pdf.CellFormat(widths[3], 8, fmt.Sprintf("Rp %.2f", item.UnitPrice), "1", 0, "R", false, 0, "")
+			pdf.CellFormat(widths[4], 8, fmt.Sprintf("Rp %.2f", item.SubTotal), "1", 1, "R", false, 0, "")
+		}
+	}
+	pdf.Ln(8)
+
+	// FOOTER
+	labelW := 130.0
+	valueW := 60.0
+
+	pdf.SetFont("Arial", "", 10)
+	pdf.CellFormat(labelW, 7, "SubTotal", "", 0, "R", false, 0, "")
+	pdf.CellFormat(valueW, 7, fmt.Sprintf("Rp %.2f", invoice.SubTotal), "", 1, "R", false, 0, "")
+
+	pdf.CellFormat(labelW, 7, "Pajak PPN (11%)", "", 0, "R", false, 0, "")
+	pdf.CellFormat(valueW, 7, fmt.Sprintf("Rp %.2f", invoice.Tax), "", 1, "R", false, 0, "")
+
+	pdf.Line(15, pdf.GetY(), 195, pdf.GetY())
+
+	pdf.SetFont("Arial", "B", 11)
+	pdf.CellFormat(labelW, 8, "Grand Total", "", 0, "R", false, 0, "")
+	pdf.CellFormat(valueW, 8, fmt.Sprintf("Rp %.2f", invoice.GrandTotal), "", 1, "R", false, 0, "")
+	pdf.Ln(5)
+
+	pdf.SetFont("Arial", "B", 10)
+	pdf.Cell(20, 7, "Status")
+	pdf.SetFont("Arial", "", 10)
+	pdf.Cell(0, 7, ": "+invoice.Status)
+	pdf.Ln(15)
+
+	pdf.SetFont("Arial", "I", 9)
+	pdf.SetTextColor(150, 150, 150)
+	pdf.CellFormat(0, 7, "Harap transfer ke Rekening BCA 123456 sebelum jatuh tempo.", "", 1, "C", false, 0, "")
+
 	var buf bytes.Buffer
-	err = pdf.Output(&buf)
-	if err != nil {
+	if err := pdf.Output(&buf); err != nil {
 		return nil, fmt.Errorf("gagal generate PDF: %w", err)
 	}
-
 	return buf.Bytes(), nil
 }
 func (s *DealService) ExportDealsToPDF() ([]byte, error) {

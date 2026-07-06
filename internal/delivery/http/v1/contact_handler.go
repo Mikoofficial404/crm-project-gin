@@ -3,6 +3,7 @@ package v1
 import (
 	"crm-project/internal/service"
 	"crm-project/pkg/response"
+	"encoding/csv"
 	"net/http"
 	"strconv"
 
@@ -155,6 +156,84 @@ func (h *ContactHandler) RestoreContact(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response.Success("Contact berhasil direstore", nil))
+}
+
+func (h *ContactHandler) ExportContactsCSV(c *gin.Context) {
+	userID := c.MustGet("user_id").(string)
+	role := c.MustGet("role").(string)
+	source := c.Query("source")
+
+	data, err := h.contactService.ExportContacts(userID, role, source)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
+		return
+	}
+
+	c.Header("Content-Type", "text/csv")
+	c.Header("Content-Disposition", "attachment;filename=contacts.csv")
+
+	writer := csv.NewWriter(c.Writer)
+	writer.Write([]string{"ID", "Name", "Email", "Phone", "Company", "Position", "Source", "AssignedTo", "CreatedAt"})
+
+	for _, contact := range data {
+		email := ""
+		if contact.Email != nil {
+			email = *contact.Email
+		}
+		company := ""
+		if contact.Company != nil {
+			company = *contact.Company
+		}
+		position := ""
+		if contact.Position != nil {
+			position = *contact.Position
+		}
+		writer.Write([]string{
+			contact.ID,
+			contact.Name,
+			email,
+			contact.Phone,
+			company,
+			position,
+			contact.Source,
+			contact.AssignedTo,
+			contact.CreatedAt.Format("2006-01-02 15:04:05"),
+		})
+	}
+	writer.Flush()
+}
+
+func (h *ContactHandler) ImportContactsCSV(c *gin.Context) {
+	userID := c.MustGet("user_id").(string)
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.Error("file tidak ditemukan"))
+		return
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("gagal membuka file"))
+		return
+	}
+	defer src.Close()
+
+	reader := csv.NewReader(src)
+	reader.Read()
+	records, err := reader.ReadAll()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.Error("gagal membaca CSV"))
+		return
+	}
+
+	imported, skipped, errors := h.contactService.ImportContactsFromCSV(records, userID)
+
+	c.JSON(http.StatusOK, response.Success("Import selesai", gin.H{
+		"imported": imported,
+		"skipped":  skipped,
+		"errors":   errors,
+	}))
 }
 
 func (h *ContactHandler) DeleteContact(c *gin.Context) {

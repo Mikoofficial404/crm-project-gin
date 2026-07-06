@@ -30,6 +30,7 @@ func (r *InvoiceRepository) GetInvoiceByDealID(dealID string) (*entity.Invoice, 
 		Preload("Items").
 		Preload("Items.Product").
 		Preload("Deal").
+		Preload("Deal.Lead").
 		Where("deal_id = ?", dealID).
 		First(&invoice).Error
 	if err != nil {
@@ -44,6 +45,7 @@ func (r *InvoiceRepository) GetInvoiceByID(invoiceID string) (*entity.Invoice, e
 		Preload("Items").
 		Preload("Items.Product").
 		Preload("Deal").
+		Preload("Deal.Lead").
 		Where("id = ?", invoiceID).
 		First(&invoice).Error
 	if err != nil {

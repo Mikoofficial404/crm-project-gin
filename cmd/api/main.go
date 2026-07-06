@@ -68,7 +68,8 @@ func main() {
 	}()
 
 	userRepo := postgres.NewUserRepository(database.GetDB())
-	authService := service.NewUserService(userRepo, rdb, clientAsynq)
+	loginHistoryRepo := postgres.NewLoginHistoryRepository(database.GetDB())
+	authService := service.NewUserService(userRepo, rdb, clientAsynq, loginHistoryRepo)
 	authHandler := v1.NewUserHandler(authService)
 
 	dealRepo := postgres.NewDealRepository(database.GetDB())
@@ -229,6 +230,8 @@ func main() {
 	protected.POST("/contacts", contactHandler.CreateContact)
 	protected.GET("/contacts", contactHandler.GetAllContacts)
 	protected.GET("/contacts/trash", middleware.RoleMiddleware("admin"), contactHandler.GetTrashedContacts)
+	protected.GET("/contacts/export", contactHandler.ExportContactsCSV)
+	protected.POST("/contacts/import", contactHandler.ImportContactsCSV)
 	protected.GET("/contacts/:id", contactHandler.GetContactByID)
 	protected.PATCH("/contacts/:id", contactHandler.UpdateContact)
 	protected.PATCH("/contacts/:id/restore", middleware.RoleMiddleware("admin"), contactHandler.RestoreContact)

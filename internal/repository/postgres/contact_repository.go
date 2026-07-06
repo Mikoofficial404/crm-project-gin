@@ -119,3 +119,18 @@ func (r *ContactRepository) GetTrashedContacts(userID, role string) ([]entity.Co
 func (r *ContactRepository) RestoreContact(contactID string) error {
 	return r.dbgorm.Unscoped().Where("id = ?", contactID).Update("deleted_at", nil).Error
 }
+
+func (r *ContactRepository) GetAllContactsForExport(assignedTo, source string) ([]entity.Contact, error) {
+	var contacts []entity.Contact
+	query := r.dbgorm.Model(&entity.Contact{})
+
+	if assignedTo != "" {
+		query = query.Where("assigned_to = ?", assignedTo)
+	}
+	if source != "" {
+		query = query.Where("source = ?", source)
+	}
+
+	err := query.Find(&contacts).Error
+	return contacts, err
+}

@@ -96,6 +96,8 @@ func (h *LeadHandler) GetLeads(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	search := c.Query("search")
 	status := c.Query("status")
+	startDate := c.Query("startDate")
+	endDate := c.Query("endDate")
 	if page < 1 {
 		page = 1
 	}
@@ -103,7 +105,7 @@ func (h *LeadHandler) GetLeads(c *gin.Context) {
 		limit = 10
 	}
 
-	data, total, err := h.leadService.GetLeads(userId, role, page, limit, search, status)
+	data, total, err := h.leadService.GetLeads(userId, role, page, limit, search, status, startDate, endDate)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return

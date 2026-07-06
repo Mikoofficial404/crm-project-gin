@@ -107,7 +107,7 @@ func (s *LeadService) CreateLeadWithContact(name string, email string, phone str
 }
 
 func (s *LeadService) CheckStaleLeads() {
-	leads, _, err := s.lead.GetAllLeads(1, 1000, "", "")
+	leads, _, err := s.lead.GetAllLeads(1, 1000, "", "", "", "")
 	if err != nil {
 		return
 	}
@@ -138,11 +138,11 @@ func (s *LeadService) CheckStaleLeads() {
 	}
 }
 
-func (s *LeadService) GetLeads(userID string, role string, page int, limit int, search string, status string) ([]entity.Lead, int64, error) {
+func (s *LeadService) GetLeads(userID string, role string, page int, limit int, search string, status string, startDate string, endDate string) ([]entity.Lead, int64, error) {
 	if role == "admin" {
-		return s.lead.GetAllLeads(page, limit, search, status)
+		return s.lead.GetAllLeads(page, limit, search, status, startDate, endDate)
 	} else {
-		return s.lead.GetLeadsByUserId(userID, page, limit, search, status)
+		return s.lead.GetLeadsByUserId(userID, page, limit, search, status, startDate, endDate)
 	}
 }
 

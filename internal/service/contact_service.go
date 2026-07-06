@@ -6,6 +6,8 @@ import (
 	"crm-project/pkg/utils"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 
 	gormErrors "gorm.io/gorm"
 )
@@ -154,6 +156,13 @@ func (s *ContactService) UpdateContact(contactID string, updates map[string]inte
 	return nil
 }
 
+func (s *ContactService) ExportContacts(userID, role, source string) ([]entity.Contact, error) {
+	if role == "sales" {
+		return s.contactRepo.GetAllContactsForExport(userID, source)
+	}
+	return s.contactRepo.GetAllContactsForExport("", source)
+}
+
 func (s *ContactService) DeleteContact(contactID string) error {
 	if contactID == "" {
 		return errors.New("ID contact tidak boleh kosong")
@@ -187,6 +196,61 @@ func (s *ContactService) GetTrashedContacts(userID, role string) ([]entity.Conta
 
 func (s *ContactService) RestoreContact(contactID string) error {
 	return s.contactRepo.RestoreContact(contactID)
+}
+
+func (s *ContactService) ImportContactsFromCSV(records [][]string, userID string) (imported int, skipped int, errMessages []string) {
+	for i, record := range records {
+		if len(record) < 2 {
+			skipped++
+			errMessages = append(errMessages, fmt.Sprintf("baris %d: kolom tidak lengkap", i+1))
+			continue
+		}
+
+		name := strings.TrimSpace(record[0])
+		phone := strings.TrimSpace(record[1])
+		email := ""
+		if len(record) >= 3 {
+			email = strings.TrimSpace(record[2])
+		}
+
+		phone = strings.ReplaceAll(phone, " ", "")
+		if strings.HasPrefix(phone, "08") {
+			phone = "+628" + phone[2:]
+		}
+
+		if email != "" && !strings.Contains(email, "@") {
+			skipped++
+			errMessages = append(errMessages, fmt.Sprintf("baris %d: email tidak valid", i+1))
+			continue
+		}
+
+		existing, _ := s.contactRepo.FindByPhone(phone)
+		if existing != nil {
+			skipped++
+			errMessages = append(errMessages, fmt.Sprintf("baris %d: nomor %s sudah terdaftar", i+1, phone))
+			continue
+		}
+
+		var emailPtr *string
+		if email != "" {
+			emailPtr = &email
+		}
+
+		_, err := s.contactRepo.CreateContact(&entity.Contact{
+			Name:       name,
+			Phone:      phone,
+			Email:      emailPtr,
+			AssignedTo: userID,
+		})
+		if err != nil {
+			skipped++
+			errMessages = append(errMessages, fmt.Sprintf("baris %d: %s", i+1, err.Error()))
+			continue
+		}
+
+		imported++
+	}
+	return imported, skipped, errMessages
 }
 
 func (s *ContactService) FindOrCreateContact(name string, phone string, assignedTo string) (*entity.Contact, error) {

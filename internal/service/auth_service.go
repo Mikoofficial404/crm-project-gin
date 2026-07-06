@@ -39,18 +39,20 @@ var GoogleOAuthConfig = &oauth2.Config{
 }
 
 type UserService struct {
-	user  *postgres.UserRepository
-	rdb   *redis.Client
-	asynq *asynq.Client
+	user         *postgres.UserRepository
+	rdb          *redis.Client
+	asynq        *asynq.Client
+	loginHistory *postgres.LoginHistoryRepository
 }
 
-func NewUserService(userRepo *postgres.UserRepository, rdb *redis.Client, clientAsynq *asynq.Client) *UserService {
+func NewUserService(userRepo *postgres.UserRepository, rdb *redis.Client, clientAsynq *asynq.Client, loginHistoryRepo *postgres.LoginHistoryRepository) *UserService {
 	GoogleOAuthConfig.ClientID = os.Getenv("GOOGLE_CLIENT_ID")
 	GoogleOAuthConfig.ClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
 	return &UserService{
-		user:  userRepo,
-		rdb:   rdb,
-		asynq: clientAsynq,
+		user:         userRepo,
+		rdb:          rdb,
+		asynq:        clientAsynq,
+		loginHistory: loginHistoryRepo,
 	}
 }
 
@@ -73,7 +75,7 @@ func (s *UserService) Register(email string, name string, password string) (*ent
 	return result, nil
 }
 
-func (s *UserService) Login(email string, password string) (token string, userID string, requires2FA bool, err error) {
+func (s *UserService) Login(email string, password string, ip string, reqUser string) (token string, userID string, requires2FA bool, err error) {
 	isUser, err := s.user.FindByEmail(email)
 	if err != nil {
 		return "", "", false, fmt.Errorf("user not found")
@@ -115,6 +117,17 @@ func (s *UserService) Login(email string, password string) (token string, userID
 	ctx := context.Background()
 	if err := s.rdb.Set(ctx, "refresh:"+tokenHash, isUser.ID, expiry).Err(); err != nil {
 		return "", "", false, fmt.Errorf("failed to save refresh token")
+	}
+
+	history := &entity.LoginHistory{
+		UserID:    isUser.ID,
+		IPAddress: ip,
+		UserAgent: reqUser,
+		Success:   true,
+	}
+
+	if err := s.loginHistory.CreateLoginHistory(history); err != nil {
+		return "", "", false, fmt.Errorf("failed to save login history")
 	}
 
 	return jwtMake, refreshToken, false, nil

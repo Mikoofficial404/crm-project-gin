@@ -32,7 +32,7 @@ func (r *LeadRepository) CreateLead(lead *entity.Lead) (*entity.Lead, error) {
 	return lead, nil
 }
 
-func (r *LeadRepository) GetAllLeads(page int, limit int, search string, status string) ([]entity.Lead, int64, error) {
+func (r *LeadRepository) GetAllLeads(page int, limit int, search string, status string, startDate string, endDate string) ([]entity.Lead, int64, error) {
 	var leads []entity.Lead
 	var total int64
 
@@ -47,6 +47,12 @@ func (r *LeadRepository) GetAllLeads(page int, limit int, search string, status 
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
+	if startDate != "" {
+		query = query.Where("created_at >= ?", startDate)
+	}
+	if endDate != "" {
+		query = query.Where("created_at <= ?", endDate+" 23:59:59")
+	}
 
 	offset := (page - 1) * limit
 	err := query.Offset(offset).Limit(limit).Order("created_at DESC").Find(&leads).Error
@@ -56,7 +62,7 @@ func (r *LeadRepository) GetAllLeads(page int, limit int, search string, status 
 	return leads, total, nil
 }
 
-func (r *LeadRepository) GetLeadsByUserId(userID string, page int, limit int, search string, status string) ([]entity.Lead, int64, error) {
+func (r *LeadRepository) GetLeadsByUserId(userID string, page int, limit int, search string, status string, startDate string, endDate string) ([]entity.Lead, int64, error) {
 	ctx := context.Background()
 	var leads []entity.Lead
 	var total int64
@@ -67,6 +73,12 @@ func (r *LeadRepository) GetLeadsByUserId(userID string, page int, limit int, se
 	}
 	if status != "" {
 		query = query.Where("status = ?", status)
+	}
+	if startDate != "" {
+		query = query.Where("created_at >= ?", startDate)
+	}
+	if endDate != "" {
+		query = query.Where("created_at <= ?", endDate+" 23:59:59")
 	}
 
 	if err := query.Count(&total).Error; err != nil {

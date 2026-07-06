@@ -60,11 +60,14 @@ func (h *UserHandler) Register(c *gin.Context) {
 
 func (h *UserHandler) Login(c *gin.Context) {
 	var req LoginRequest
+	ip := c.ClientIP()
+	reqUser := c.Request.UserAgent()
+
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	token, userID, requires2FA, err := h.userService.Login(req.Email, req.Password)
+	token, userID, requires2FA, err := h.userService.Login(req.Email, req.Password, ip, reqUser)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
@@ -77,6 +80,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 		})
 		return
 	}
+
 	c.JSON(http.StatusOK, response.Success("Login berhasil", gin.H{"token": token}))
 }
 

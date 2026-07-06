@@ -61,6 +61,7 @@ func MigrateDB() error {
 		&entity.CampaignRecipient{},
 		&entity.DealComment{},
 		&entity.DealHistory{},
+		&entity.LoginHistory{},
 	)
 	if err != nil {
 		return err
