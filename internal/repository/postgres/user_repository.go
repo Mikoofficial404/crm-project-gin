@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"crm-project/internal/models/entity"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -53,15 +54,28 @@ func (r *UserRepository) UpdatePassword(userID string, hashedPassword string) er
 	return err
 }
 
-func (r *UserRepository) Update2FA(userID string, secret string) error {
+func (r *UserRepository) Update2FASecret(userID string, secret string) error {
 	ctx := context.Background()
-	user := entity.User{
-		TwoFactorSecret:    secret,
-		IsTwoFactorEnabled: true,
-	}
-	err := r.dbGorm.WithContext(ctx).Model(&entity.User{}).Where("id = ?", userID).Updates(&user).Error
+	err := r.dbGorm.WithContext(ctx).Model(&entity.User{}).Where("id = ?", userID).Update("two_factor_secret", secret).Error
 	return err
+}
 
+func (r *UserRepository) Enable2FA(userID string) error {
+	ctx := context.Background()
+	err := r.dbGorm.WithContext(ctx).Model(&entity.User{}).Where("id = ?", userID).Update("is_two_factor_enabled", true).Error
+	return err
+}
+
+func (r *UserRepository) UpdateLastLogin(userID string) error {
+	ctx := context.Background()
+	err := r.dbGorm.WithContext(ctx).Model(&entity.User{}).Where("id = ?", userID).Update("last_login", time.Now()).Error
+	return err
+}
+
+func (r *UserRepository) ToggleOnlineStatus(userID string, isOnline bool) error {
+	ctx := context.Background()
+	err := r.dbGorm.WithContext(ctx).Model(&entity.User{}).Where("id = ?", userID).Update("is_online", isOnline).Error
+	return err
 }
 
 func (r *UserRepository) SearchUsers(keyword string) ([]entity.User, error) {
@@ -101,4 +115,10 @@ func (r *UserRepository) GetFirstUser() (*entity.User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (r *UserRepository) CheckIsManager(userID string) bool {
+	var count int64
+	r.dbGorm.Table("teams").Where("manager_id = ? AND deleted_at IS NULL", userID).Count(&count)
+	return count > 0
 }

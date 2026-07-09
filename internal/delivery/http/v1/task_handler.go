@@ -127,11 +127,18 @@ func (h *TaskHandler) UpdateTask(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
 	role := c.MustGet("role").(string)
 
-	priority := "MEDIUM"
+	existingTask, errTask := h.taskService.GetTaskByID(taskID)
+	if errTask != nil {
+		c.JSON(http.StatusNotFound, response.Error("Task tidak ditemukan"))
+		return
+	}
+
+	priority := existingTask.Priority
 	if req.Priority != nil {
 		priority = *req.Priority
 	}
-	category := "OTHER"
+	
+	category := existingTask.Category
 	if req.Category != nil {
 		category = *req.Category
 	}

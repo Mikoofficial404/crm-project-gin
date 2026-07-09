@@ -63,3 +63,18 @@ func (r *InvoiceRepository) UpdateStatus(invoiceID string, status string) (*enti
 	}
 	return &invoice, err
 }
+
+func (r *InvoiceRepository) GetAllInvoices() ([]entity.Invoice, error) {
+	var invoices []entity.Invoice
+	err := r.dbGorm.
+		Preload("Items").
+		Preload("Items.Product").
+		Preload("Deal").
+		Preload("Deal.Lead").
+		Order("created_at desc").
+		Find(&invoices).Error
+	if err != nil {
+		return nil, err
+	}
+	return invoices, nil
+}

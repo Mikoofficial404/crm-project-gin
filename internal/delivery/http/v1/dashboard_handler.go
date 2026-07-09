@@ -26,7 +26,10 @@ func NewDashboardHandler(dashboardService *service.DashboardService) *DashboardH
 // @Failure      500 {object} response.Response
 // @Router       /dashboard [get]
 func (h *DashboardHandler) GetDashboardStats(c *gin.Context) {
-	stats, err := h.dashboardService.GetStats()
+	userID := c.GetString("user_id")
+	role := c.GetString("role")
+
+	stats, err := h.dashboardService.GetStats(role, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, response.Error("Gagal mengambil data dashboard"))
 		return
@@ -42,7 +45,10 @@ func (h *DashboardHandler) GetDashboardStats(c *gin.Context) {
 // @Failure      500 {object} response.Response
 // @Router       /analytics/forecasting [get]
 func (h *DashboardHandler) GetAnalytics(c *gin.Context) {
-	data, err := h.dashboardService.GetForecastingAnalytics()
+	userID := c.GetString("user_id")
+	role := c.GetString("role")
+
+	data, err := h.dashboardService.GetForecastingAnalytics(role, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, response.Error("Gagal mengambil data analytics"))
 		return

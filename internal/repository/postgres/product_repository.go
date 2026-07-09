@@ -32,11 +32,11 @@ func (r *ProductRepository) GetProductByID(productID string) (*entity.Product, e
 	return &product, err
 }
 
-func (r *ProductRepository) GetAllProducts(onlyActive bool) ([]entity.Product, error) {
+func (r *ProductRepository) GetAllProducts(isActive *bool) ([]entity.Product, error) {
 	var products []entity.Product
 	query := r.dbgorm.Where("deleted_at IS NULL")
-	if onlyActive {
-		query = query.Where("is_active = true")
+	if isActive != nil {
+		query = query.Where("is_active = ?", *isActive)
 	}
 	err := query.Order("name ASC").Find(&products).Error
 	return products, err

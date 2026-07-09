@@ -7,24 +7,27 @@ import (
 )
 
 type Hub struct {
-	Clients map[string]*websocket.Conn
+	Clients map[string]map[*websocket.Conn]bool
 }
 
-var AppHub = &Hub{Clients: make(map[string]*websocket.Conn)}
+var AppHub = &Hub{Clients: make(map[string]map[*websocket.Conn]bool)}
 
 func SendMessageToUser(userID string, message string) error {
-
-	cable, ok := AppHub.Clients[userID]
-	if !ok {
-		return fmt.Errorf("user %s tidak ditemukan", userID)
+	userConns, ok := AppHub.Clients[userID]
+	if !ok || len(userConns) == 0 {
+		return fmt.Errorf("user %s tidak memiliki koneksi aktif", userID)
 	}
 
-	cable.WriteMessage(websocket.TextMessage, []byte(message))
+	for conn := range userConns {
+		conn.WriteMessage(websocket.TextMessage, []byte(message))
+	}
 	return nil
 }
 
 func BroadcastMessage(message string) {
-	for _, conn := range AppHub.Clients {
-		conn.WriteMessage(websocket.TextMessage, []byte(message))
+	for _, userConns := range AppHub.Clients {
+		for conn := range userConns {
+			conn.WriteMessage(websocket.TextMessage, []byte(message))
+		}
 	}
 }

@@ -3,6 +3,7 @@ package v1
 import (
 	"context"
 	"crm-project/internal/delivery/websocket"
+	"crm-project/internal/models/entity"
 	"crm-project/internal/repository/postgres"
 	"crm-project/internal/service"
 	"fmt"
@@ -82,20 +83,38 @@ func (h *WebhookHandler) ReceiveWhatsApp(c *gin.Context) {
 	if existingLead == nil {
 		logrus.Info("[Webhook] Klien baru terdeteksi! Membuat Lead otomatis...")
 
-		// round-robin assign ke sales
 		salesAll, err := h.userRepo.GetAllUsers()
 		if err != nil {
 			logrus.WithError(err).Error("[Webhook] Gagal get users")
 			c.JSON(200, gin.H{"status": "ok"})
 			return
 		}
+
+		var salesOnly []entity.User
+		for _, u := range salesAll {
+			if u.Role == "sales" && u.IsOnline {
+				salesOnly = append(salesOnly, u)
+			}
+		}
+
+		if len(salesOnly) == 0 {
+			logrus.Error("[Webhook] Tidak ada sales tersedia untuk di-assign")
+			c.JSON(200, gin.H{"status": "ok"})
+			return
+		}
+
 		turnNo, err := h.redisClien.Get(context.Background(), "sales_turn_index").Int()
 		if err != nil {
 			turnNo = 0
 		}
-		assignedID := salesAll[turnNo].ID
+
+		if turnNo >= len(salesOnly) {
+			turnNo = 0
+		}
+
+		assignedID := salesOnly[turnNo].ID
 		newNo := turnNo + 1
-		if newNo >= len(salesAll) {
+		if newNo >= len(salesOnly) {
 			newNo = 0
 		}
 		h.redisClien.Set(context.Background(), "sales_turn_index", newNo, 0)
@@ -144,7 +163,7 @@ func (h *WebhookHandler) ReceiveWhatsApp(c *gin.Context) {
 			logrus.WithError(errAct).Error("[Webhook] Gagal mencatat Aktivitas")
 		} else {
 			notifTitle := fmt.Sprintf("Pesan Wa: %s", existingLead.Name)
-			errNotif := h.notifSvc.CreateNotification(assigneeID, notifTitle, payload.Payload.Body)
+			errNotif := h.notifSvc.CreateNotification(assigneeID, notifTitle, payload.Payload.Body, "")
 			if errNotif != nil {
 				logrus.WithError(errNotif).Warn("[Webhook] Gagal membuat Notifikasi")
 			}

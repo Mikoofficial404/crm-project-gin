@@ -36,8 +36,8 @@ func (s *ProductService) CreateProduct(name, description, unit string, price flo
 	return s.productRepo.CreateProduct(product)
 }
 
-func (s *ProductService) GetAllProducts(onlyActive bool) ([]entity.Product, error) {
-	return s.productRepo.GetAllProducts(onlyActive)
+func (s *ProductService) GetAllProducts(isActive *bool) ([]entity.Product, error) {
+	return s.productRepo.GetAllProducts(isActive)
 }
 
 func (s *ProductService) GetProductByID(productID string) (*entity.Product, error) {

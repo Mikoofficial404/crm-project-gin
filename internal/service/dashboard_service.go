@@ -5,6 +5,7 @@ import (
 	"crm-project/internal/models/entity"
 	"crm-project/internal/repository/postgres"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -15,10 +16,6 @@ type DashboardService struct {
 	redisClient *redis.Client
 }
 
-type DashboardStats struct {
-	TotalContacts int64
-}
-
 func NewDashboardService(repo *postgres.DashboardRepository, redisClient *redis.Client) *DashboardService {
 	return &DashboardService{
 		repo:        repo,
@@ -26,9 +23,9 @@ func NewDashboardService(repo *postgres.DashboardRepository, redisClient *redis.
 	}
 }
 
-func (s *DashboardService) GetStats() (*postgres.DashboardStats, error) {
+func (s *DashboardService) GetStats(role, userID string) (*postgres.DashboardStats, error) {
 	ctx := context.Background()
-	cacheKey := "crm_dashboard_stats"
+	cacheKey := fmt.Sprintf("crm_dashboard_stats_%s_%s", role, userID)
 
 	data, err := s.redisClient.Get(ctx, cacheKey).Result()
 	if err == nil {
@@ -38,43 +35,38 @@ func (s *DashboardService) GetStats() (*postgres.DashboardStats, error) {
 		}
 	}
 
-	totalContacts, err := s.repo.GetTotalContacts()
+	totalContacts, err := s.repo.GetTotalContacts(role, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	stats, err := s.repo.GetStats()
+	stats, err := s.repo.GetStats(role, userID)
 	if err != nil {
 		return nil, err
 	}
+
+	stats.TotalContacts = totalContacts
 
 	dataJson, _ := json.Marshal(stats)
 	s.redisClient.Set(ctx, cacheKey, dataJson, 5*time.Minute)
 
-	return &postgres.DashboardStats{
-		TotalLeads:       totalContacts,
-		TotalDeals:       stats.TotalDeals,
-		TotalWonDeals:    stats.TotalWonDeals,
-		TotalRevenueWon:  stats.TotalRevenueWon,
-		PotentialRevenue: stats.PotentialRevenue,
-		TotalContacts:    totalContacts,
-	}, nil
+	return stats, nil
 }
 
-func (s *DashboardService) GetForecastingAnalytics() (*entity.AnalyticsResponse, error) {
-	addMoney, err := s.repo.GetTotalRevenue()
+func (s *DashboardService) GetForecastingAnalytics(role, userID string) (*entity.AnalyticsResponse, error) {
+	addMoney, err := s.repo.GetTotalRevenue(role, userID)
 	if err != nil {
 		return nil, err
 	}
-	predictioMoney, err := s.repo.GetProjectedRevenue()
+	predictioMoney, err := s.repo.GetProjectedRevenue(role, userID)
 	if err != nil {
 		return nil, err
 	}
-	totalDealWon, err := s.repo.GetTotalWonDeals()
+	totalDealWon, err := s.repo.GetTotalWonDeals(role, userID)
 	if err != nil {
 		return nil, err
 	}
-	totalLeads, err := s.repo.GetTotalLeads()
+	totalLeads, err := s.repo.GetTotalLeads(role, userID)
 	if err != nil {
 		return nil, err
 	}

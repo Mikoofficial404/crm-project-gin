@@ -145,7 +145,7 @@ func (r *ReportRepository) GetSalesPerformance(startDate, endDate time.Time) ([]
 		Joins("LEFT JOIN deals ON deals.assigned_to = users.id AND deals.deleted_at IS NULL AND deals.created_at BETWEEN ? AND ?", startDate, endDate).
 		Joins("LEFT JOIN pipeline_stages ps_won ON ps_won.id = deals.stage_id AND ps_won.is_closed_won = true AND ps_won.deleted_at IS NULL").
 		Joins("LEFT JOIN pipeline_stages ps_lost ON ps_lost.id = deals.stage_id AND ps_lost.is_closed_lost = true AND ps_lost.deleted_at IS NULL").
-		Joins("LEFT JOIN activities ON activities.assigned_to = users.id AND activities.deleted_at IS NULL AND activities.created_at BETWEEN ? AND ?", startDate, endDate).
+		Joins("LEFT JOIN activities ON activities.assigned_to::uuid = users.id AND activities.deleted_at IS NULL AND activities.created_at BETWEEN ? AND ?", startDate, endDate).
 		Joins("LEFT JOIN leads ON leads.assigned_to = users.id AND leads.deleted_at IS NULL AND leads.created_at BETWEEN ? AND ?", startDate, endDate).
 		Where("users.role = 'sales'").
 		Group("users.id, users.name, users.email").
@@ -218,7 +218,7 @@ func (r *ReportRepository) GetActivityReport(startDate, endDate time.Time) ([]Ac
 			activities.type AS activity_type,
 			COUNT(activities.id) AS total_count
 		`).
-		Joins("JOIN users ON users.id = activities.assigned_to").
+		Joins("JOIN users ON users.id = activities.assigned_to::uuid").
 		Where("activities.deleted_at IS NULL AND activities.created_at BETWEEN ? AND ?", startDate, endDate).
 		Group("users.id, users.name, activities.type").
 		Order("users.name, total_count DESC").

@@ -67,7 +67,8 @@ func (r *LeadRepository) GetLeadsByUserId(userID string, page int, limit int, se
 	var leads []entity.Lead
 	var total int64
 
-	query := r.dbGorm.WithContext(ctx).Model(&entity.Lead{}).Preload("Contact").Where("assigned_to = ?", userID)
+	allowedUserIDsQuery := r.dbGorm.Model(&entity.User{}).Select("id").Where("id = ? OR team_id IN (SELECT id FROM teams WHERE manager_id = ?)", userID, userID)
+	query := r.dbGorm.WithContext(ctx).Model(&entity.Lead{}).Preload("Contact").Where("assigned_to IN (?)", allowedUserIDsQuery)
 	if search != "" {
 		query = query.Where("to_tsvector('simple', coalesce(name,'') || ' ' || coalesce(email,'') || ' ' || coalesce(phone,'')) @@ plainto_tsquery('simple', ?)", search)
 	}
@@ -221,6 +222,11 @@ func (r *LeadRepository) UpdateLead(leadID string, name string, email string, ph
 		"phone": phone,
 	}).Error
 	return err
+}
+
+func (r *LeadRepository) UpdateAssignedTo(leadID string, newAssignedTo string) error {
+	ctx := context.Background()
+	return r.dbGorm.WithContext(ctx).Model(&entity.Lead{}).Where("id = ?", leadID).Update("assigned_to", newAssignedTo).Error
 }
 
 func (r *LeadRepository) GetAgingLeads(userID, role string, days int) ([]entity.Lead, error) {

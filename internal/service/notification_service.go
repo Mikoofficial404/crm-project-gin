@@ -18,7 +18,7 @@ func NewNotificationService(notifRepo *postgres.NotificationRepository) *Notific
 	}
 }
 
-func (s *NotificationService) CreateNotification(userID string, title string, message string) error {
+func (s *NotificationService) CreateNotification(userID string, title string, message string, link string) error {
 	parseUUID, err := uuid.Parse(userID)
 	if err != nil {
 		return errors.New("invalid user id")
@@ -28,6 +28,7 @@ func (s *NotificationService) CreateNotification(userID string, title string, me
 		UserID:  parseUUID,
 		Title:   title,
 		Message: message,
+		Link:    link,
 		IsRead:  false,
 	}
 	_, err = s.notificationRepo.CreateNotification(notif)

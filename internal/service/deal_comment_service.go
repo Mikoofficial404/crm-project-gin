@@ -45,6 +45,7 @@ func (s *DealCommentService) AddComment(dealID, userID, content string, mentione
 			mentionedUserID,
 			"Kamu di-mention di sebuah komentar",
 			content,
+			fmt.Sprintf("/deals/%s", dealID),
 		)
 		message := fmt.Sprintf("Kamu di-mention di komentar deal oleh %s: %s", userID, content)
 		websocket.SendMessageToUser(mentionedUserID, message)

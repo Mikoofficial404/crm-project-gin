@@ -85,7 +85,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 	reqUser := c.Request.UserAgent()
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
+		c.JSON(http.StatusBadRequest, response.Error("Format email tidak valid atau password minimal 6 karakter."))
 		return
 	}
 	token, userID, requires2FA, err := h.userService.Login(req.Email, req.Password, ip, reqUser)
@@ -247,6 +247,28 @@ func (h *UserHandler) Setup2FA(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Success("Setup 2FA berhasil", data))
 }
 
+func (h *UserHandler) Verify2FASetup(c *gin.Context) {
+	userID := c.MustGet("user_id").(string)
+	var req struct {
+		OTPCode string `json:"otp_code" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error("OTP code wajib diisi"))
+		return
+	}
+	_, err := h.userService.VerifyOTP(userID, req.OTPCode)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.Error("Kode OTP tidak valid"))
+		return
+	}
+	err = h.userService.Enable2FA(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Gagal mengaktifkan 2FA"))
+		return
+	}
+	c.JSON(http.StatusOK, response.Success("2FA berhasil diverifikasi dan diaktifkan", nil))
+}
+
 func (h *UserHandler) LoginGoogle(c *gin.Context) {
 	url := h.userService.GetGoogleLoginURL()
 	c.Redirect(http.StatusTemporaryRedirect, url)
@@ -256,10 +278,10 @@ func (h *UserHandler) CallbackGoogle(c *gin.Context) {
 	code := c.Query("code")
 	token, err := h.userService.GoogleCallback(code)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
+		c.Redirect(http.StatusTemporaryRedirect, "http://localhost:5173/basic-login?error="+err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, response.Success("Login Google berhasil", gin.H{"token": token}))
+	c.Redirect(http.StatusTemporaryRedirect, "http://localhost:5173/basic-login?token="+token)
 }
 
 // GetMe godoc
@@ -278,12 +300,17 @@ func (h *UserHandler) GetMe(c *gin.Context) {
 		c.JSON(http.StatusNotFound, response.Error("User tidak ditemukan"))
 		return
 	}
+
+	isManager := h.userService.CheckIsManager(userID)
+
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil profil", gin.H{
 		"id":                    user.ID,
 		"name":                  user.Name,
 		"email":                 user.Email,
 		"role":                  user.Role,
 		"is_two_factor_enabled": user.IsTwoFactorEnabled,
+		"is_online":             user.IsOnline,
+		"is_manager":            isManager,
 	}))
 }
 
@@ -303,6 +330,33 @@ func (h *UserHandler) GetUsers(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil data users", users))
+}
+
+// GetMentionableUsers godoc
+// @Summary     Get mentionable users
+// @Description Ambil daftar user untuk fitur mention
+// @Tags        users
+// @Security    BearerAuth
+// @Produce     json
+// @Success     200 {object} response.Response
+// @Router      /users/mentionable [get]
+func (h *UserHandler) GetMentionableUsers(c *gin.Context) {
+	users, err := h.userService.GetAllUsers()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Gagal mengambil data users"))
+		return
+	}
+
+	// Map to only return id and name
+	var mentionable []map[string]string
+	for _, u := range users {
+		mentionable = append(mentionable, map[string]string{
+			"id":   u.ID,
+			"name": u.Name,
+		})
+	}
+
+	c.JSON(http.StatusOK, response.Success("Berhasil", mentionable))
 }
 
 // GetLoginHistory godoc
@@ -334,4 +388,36 @@ func (h *UserHandler) GetLoginHistory(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response.Success("Berhasil mengambil riwayat login", histories))
+}
+
+type ToggleOnlineRequest struct {
+	IsOnline bool `json:"is_online"`
+}
+
+// ToggleOnlineStatus godoc
+// @Summary     Ubah status online
+// @Description Ubah status online user yang sedang login (untuk terima lead round-robin)
+// @Tags        users
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       body body ToggleOnlineRequest true "Status online"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /users/me/status [patch]
+func (h *UserHandler) ToggleOnlineStatus(c *gin.Context) {
+	userID := c.MustGet("user_id").(string)
+
+	var req ToggleOnlineRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
+		return
+	}
+
+	if err := h.userService.ToggleOnlineStatus(userID, req.IsOnline); err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Gagal mengubah status: "+err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, response.Success("Berhasil mengubah status", nil))
 }

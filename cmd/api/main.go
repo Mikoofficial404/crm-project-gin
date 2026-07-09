@@ -39,6 +39,7 @@ import (
 	"github.com/getsentry/sentry-go"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-contrib/cors"
 	"github.com/hibiken/asynq"
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -81,6 +82,14 @@ func main() {
 	}
 
 	r := gin.Default()
+	
+	// Setup CORS
+	corsConfig := cors.DefaultConfig()
+	corsConfig.AllowAllOrigins = true
+	corsConfig.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization", "X-Requested-With", "Accept"}
+	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"}
+	r.Use(cors.New(corsConfig))
+
 	r.Use(middleware.RequestIDMiddleware())
 	r.Use(middleware.SentryMiddleware())
 	r.Use(middleware.PrometheusMiddleware())
@@ -128,10 +137,9 @@ func main() {
 	dealCommentService := service.NewDealCommentService(dealCommentRepo, notifService)
 	dealCommentHandler := v1.NewDealCommentHandler(dealCommentService)
 
-	dealService := service.NewDealService(dealRepo, auditRepo, clientAsynq, invoiceRepo, rdb, pipelineStageRepo, dealProductRepo, dealHistoryRepo, notifRepo)
-	dealHandler := v1.NewDealHandler(dealService)
-
 	leadRepo := postgres.NewLeadRepository(database.GetDB())
+	dealService := service.NewDealService(dealRepo, auditRepo, clientAsynq, invoiceRepo, rdb, pipelineStageRepo, dealProductRepo, dealHistoryRepo, notifRepo, leadRepo)
+	dealHandler := v1.NewDealHandler(dealService)
 
 	contactRepo := postgres.NewContactRepository(database.GetDB())
 	contactService := service.NewContactService(contactRepo, auditRepo)
@@ -209,8 +217,11 @@ func main() {
 	protected.POST("/logout", authHandler.Logout)
 	protected.GET("/me", authHandler.GetMe)
 	protected.GET("/me/login-history", authHandler.GetLoginHistory)
+	protected.PATCH("/me/status", authHandler.ToggleOnlineStatus)
 	protected.PATCH("/profile/password", authHandler.ChangePassword)
 	protected.GET("/profile/2fa/setup", authHandler.Setup2FA)
+	protected.POST("/profile/2fa/verify", authHandler.Verify2FASetup)
+	protected.GET("/users/mentionable", authHandler.GetMentionableUsers)
 
 	protected.POST("/leads", leadHandle.CreateLeader)
 	protected.POST("/leads/import", leadHandle.ImportCSV)
@@ -225,12 +236,15 @@ func main() {
 
 	protected.POST("/deals", dealHandler.CreateDeal)
 	protected.GET("/deals", dealHandler.GetDeals)
+	protected.GET("/deals/:id", dealHandler.GetDealByID)
 	protected.PATCH("/deals/:id/stage", dealHandler.UpdateStage)
+	protected.PATCH("/deals/reorder", dealHandler.Reorder)
 	protected.PUT("/deals/:id", dealHandler.UpdateDeal)
 	protected.DELETE("/deals/:id", middleware.RoleMiddleware("admin"), dealHandler.DeleteDeal)
 	protected.GET("/deals/export/pdf", dealHandler.ExportPDF)
 	protected.GET("/deals/export/excel", dealHandler.ExportExcel)
 	protected.GET("/deals/:id/invoice", dealHandler.DownloadInvoice)
+	protected.PATCH("/deals/:id/assign", dealHandler.AssignDeal)
 	protected.POST("/deals/:id/products", dealHandler.AssignProduct)
 	protected.DELETE("/deals/:id/products/:productId", dealHandler.RemoveProduct)
 	protected.GET("/deals/:id/products", dealHandler.GetDealProducts)
@@ -240,6 +254,7 @@ func main() {
 	protected.POST("/deals/:id/comments", dealCommentHandler.AddComment)
 	protected.GET("/deals/:id/comments", dealCommentHandler.GetComments)
 	protected.DELETE("/deals/:id/comments/:commentId", dealCommentHandler.DeleteComment)
+	protected.GET("/invoices", dealHandler.GetInvoices)
 	protected.PATCH("/invoices/:id/status", dealHandler.UpdateInvoiceStatus)
 
 	protected.POST("/activities", activityHandler.CreateActivity)
@@ -285,10 +300,11 @@ func main() {
 	protected.DELETE("/contacts/:id", contactHandler.DeleteContact)
 
 	adminPipeline := protected.Group("/pipelines")
+	protected.GET("/pipelines", pipelineHandler.GetAllPipelines)
+	protected.GET("/pipelines/:id", pipelineHandler.GetPipelineByID)
+
 	adminPipeline.Use(middleware.RoleMiddleware("admin"))
 	adminPipeline.POST("", pipelineHandler.CreatePipeline)
-	adminPipeline.GET("", pipelineHandler.GetAllPipelines)
-	adminPipeline.GET("/:id", pipelineHandler.GetPipelineByID)
 	adminPipeline.PATCH("/:id", pipelineHandler.UpdatePipeline)
 	adminPipeline.DELETE("/:id", pipelineHandler.DeletePipeline)
 	adminPipeline.POST("/:id/stages", pipelineHandler.AddStage)
@@ -303,11 +319,13 @@ func main() {
 	protected.GET("/reports/activity", middleware.RoleMiddleware("admin"), reportHandler.GetActivityReport)
 	protected.GET("/leads/aging", leadHandle.GetAgingLeads)
 
+	// Semua user (termasuk sales) boleh melihat daftar produk
+	protected.GET("/products", productHandler.GetAllProducts)
+	protected.GET("/products/:id", productHandler.GetProductByID)
+
 	adminProduct := protected.Group("/products")
 	adminProduct.Use(middleware.RoleMiddleware("admin"))
 	adminProduct.POST("", productHandler.CreateProduct)
-	adminProduct.GET("", productHandler.GetAllProducts)
-	adminProduct.GET("/:id", productHandler.GetProductByID)
 	adminProduct.PATCH("/:id", productHandler.UpdateProduct)
 	adminProduct.DELETE("/:id", productHandler.DeleteProduct)
 

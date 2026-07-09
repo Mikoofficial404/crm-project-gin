@@ -36,7 +36,7 @@ func NewCampaignService(
 
 func (s *CampaignService) CreateCampaign(name, subject, body, channel, createdBy string) (*entity.Campaign, error) {
 	if name == "" || subject == "" || body == "" {
-		return nil, errors.New("name, subject, and body are required")
+		return nil, errors.New("nama, subjek, dan isi pesan wajib diisi")
 	}
 	if channel != "email" && channel != "whatsapp" {
 		channel = "email"
@@ -66,7 +66,7 @@ func (s *CampaignService) UpdateCampaign(campaignID, userID string, name, subjec
 		return err
 	}
 	if campaign.Status != "DRAFT" {
-		return errors.New("only DRAFT campaigns can be edited")
+		return errors.New("hanya kampanye DRAFT yang bisa diedit")
 	}
 
 	updates := map[string]interface{}{}
@@ -91,7 +91,7 @@ func (s *CampaignService) DeleteCampaign(campaignID string) error {
 		return err
 	}
 	if campaign.Status != "DRAFT" {
-		return errors.New("only DRAFT campaigns can be deleted")
+		return errors.New("hanya kampanye DRAFT yang bisa dihapus")
 	}
 	return s.campaignRepo.DeleteCampaign(campaignID)
 }
@@ -103,7 +103,7 @@ func (s *CampaignService) AddRecipientsByLeadIDs(campaignID string, leadIDs []st
 	}
 
 	if campaign.Status != "DRAFT" {
-		return errors.New("cannot add recipients to a non-DRAFT campaign")
+		return errors.New("tidak bisa menambahkan penerima ke kampanye yang bukan DRAFT")
 	}
 
 	var recipients []entity.CampaignRecipient
@@ -137,7 +137,7 @@ func (s *CampaignService) AddRecipientsByLeadIDs(campaignID string, leadIDs []st
 	}
 
 	if len(recipients) == 0 {
-		return errors.New("no valid recipients found")
+		return errors.New("tidak ada penerima yang valid ditemukan")
 	}
 	return s.recipientRepo.BulkInsertRecipients(recipients)
 }
@@ -148,7 +148,7 @@ func (s *CampaignService) AddRecipientsByContactIDs(campaignID string, contactID
 		return err
 	}
 	if campaign.Status != "DRAFT" {
-		return errors.New("cannot add recipients to a non-DRAFT campaign")
+		return errors.New("tidak bisa menambahkan penerima ke kampanye yang bukan DRAFT")
 	}
 
 	var recipients []entity.CampaignRecipient
@@ -182,7 +182,7 @@ func (s *CampaignService) AddRecipientsByContactIDs(campaignID string, contactID
 	}
 
 	if len(recipients) == 0 {
-		return errors.New("no valid recipients found")
+		return errors.New("tidak ada penerima yang valid ditemukan")
 	}
 	return s.recipientRepo.BulkInsertRecipients(recipients)
 }
@@ -193,7 +193,7 @@ func (s *CampaignService) SendCampaign(campaignID string) error {
 		return err
 	}
 	if campaign.Status != "DRAFT" && campaign.Status != "SCHEDULED" {
-		return errors.New("campaign must be in DRAFT or SCHEDULED status to send")
+		return errors.New("kampanye harus berstatus DRAFT atau SCHEDULED untuk dikirim")
 	}
 
 	pending, err := s.recipientRepo.GetPendingRecipients(campaignID)
@@ -201,7 +201,7 @@ func (s *CampaignService) SendCampaign(campaignID string) error {
 		return err
 	}
 	if len(pending) == 0 {
-		return errors.New("no pending recipients found")
+		return errors.New("tidak ada penerima tertunda yang ditemukan")
 	}
 
 	if err := s.campaignRepo.UpdateCampaign(campaignID, map[string]interface{}{
@@ -233,10 +233,11 @@ func (s *CampaignService) ScheduleCampaign(campaignID string, scheduledAt time.T
 		return err
 	}
 	if campaign.Status != "DRAFT" {
-		return errors.New("only DRAFT campaigns can be scheduled")
+		return errors.New("hanya kampanye DRAFT yang bisa dijadwalkan")
 	}
-	if scheduledAt.Before(time.Now()) {
-		return errors.New("scheduled_at must be in the future")
+	// Berikan toleransi waktu mundur 2 menit untuk proses klik dan loading
+	if scheduledAt.Before(time.Now().Add(-2 * time.Minute)) {
+		return errors.New("waktu jadwal harus di masa depan")
 	}
 
 	pending, err := s.recipientRepo.GetPendingRecipients(campaignID)
@@ -244,7 +245,7 @@ func (s *CampaignService) ScheduleCampaign(campaignID string, scheduledAt time.T
 		return err
 	}
 	if len(pending) == 0 {
-		return errors.New("add recipients before scheduling")
+		return errors.New("tambahkan penerima terlebih dahulu sebelum menjadwalkan")
 	}
 
 	return s.campaignRepo.UpdateCampaign(campaignID, map[string]interface{}{

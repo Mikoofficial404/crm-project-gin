@@ -15,6 +15,10 @@ type DealHandler struct {
 	dealService *service.DealService
 }
 
+type AssignDealRequest struct {
+	AssignedTo string `json:"assigned_to" binding:"required"`
+}
+
 type CreateDealRequest struct {
 	Name       string  `json:"name" binding:"required"`
 	Value      float64 `json:"value" binding:"required"`
@@ -142,6 +146,31 @@ func (h *DealHandler) GetDeals(c *gin.Context) {
 	c.JSON(http.StatusOK, response.Paginated(data, total, page, limit))
 }
 
+// GetDealByID godoc
+// @Summary     Get deal detail
+// @Description Ambil detail deal berdasarkan ID
+// @Tags        deals
+// @Security    BearerAuth
+// @Produce     json
+// @Param       id path string true "Deal ID"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /deals/{id} [get]
+func (h *DealHandler) GetDealByID(c *gin.Context) {
+	dealID := c.Param("id")
+	if dealID == "" {
+		c.JSON(http.StatusBadRequest, response.Error("ID deal tidak boleh kosong"))
+		return
+	}
+
+	deal, err := h.dealService.GetDealByID(dealID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, response.Error(err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil detail deal", deal))
+}
+
 // UpdateStage godoc
 // @Summary     Update stage deal
 // @Description Pindahkan deal ke stage yang berbeda
@@ -175,6 +204,41 @@ func (h *DealHandler) UpdateStage(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusAccepted, response.Success("Stage deal berhasil diupdate", gin.H{"id": dealID, "stage_id": req.StageID}))
+}
+
+// AssignDeal godoc
+// @Summary     Re-assign deal
+// @Description Memindahkan hak milik deal ke sales lain (Hanya Admin)
+// @Tags        deals
+// @Security    BearerAuth
+// @Accept      json
+// @Produce     json
+// @Param       id   path string           true "Deal ID"
+// @Param       body body AssignDealRequest true "Data user yang baru"
+// @Success     202 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /deals/{id}/assign [patch]
+func (h *DealHandler) AssignDeal(c *gin.Context) {
+	dealID := c.Param("id")
+	if dealID == "" {
+		c.JSON(http.StatusBadRequest, response.Error("ID deal tidak boleh kosong"))
+		return
+	}
+
+	var req AssignDealRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
+		return
+	}
+
+	userId := c.MustGet("user_id").(string)
+	role := c.MustGet("role").(string)
+
+	if err := h.dealService.AssignDeal(dealID, req.AssignedTo, userId, role); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
+		return
+	}
+	c.JSON(http.StatusAccepted, response.Success("Pemilik deal berhasil diubah", gin.H{"id": dealID, "assigned_to": req.AssignedTo}))
 }
 
 // DeleteDeal godoc
@@ -342,6 +406,15 @@ func (h *DealHandler) UpdateDeal(c *gin.Context) {
 // @Success     200 {object} response.Response
 // @Failure     400 {object} response.Response
 // @Router      /invoices/{id}/status [patch]
+func (h *DealHandler) GetInvoices(c *gin.Context) {
+	invoices, err := h.dealService.GetAllInvoices()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Gagal mengambil data tagihan"))
+		return
+	}
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil data tagihan", invoices))
+}
+
 func (h *DealHandler) UpdateInvoiceStatus(c *gin.Context) {
 	invoiceID := c.Param("id")
 	if invoiceID == "" {

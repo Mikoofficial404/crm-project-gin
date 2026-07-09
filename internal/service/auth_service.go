@@ -130,6 +130,9 @@ func (s *UserService) Login(email string, password string, ip string, reqUser st
 		return "", "", false, fmt.Errorf("failed to save login history")
 	}
 
+	// Update last_login
+	s.user.UpdateLastLogin(isUser.ID)
+
 	return jwtMake, refreshToken, false, nil
 }
 
@@ -226,6 +229,9 @@ func (s *UserService) VerifyOTP(userID string, otpCode string) (string, error) {
 		return "", fmt.Errorf("failed to create JWT token")
 	}
 
+	// Update last_login
+	s.user.UpdateLastLogin(userID)
+
 	return jwtMake, nil
 }
 
@@ -241,12 +247,16 @@ func (s *UserService) SetUp2FA(userID string) (string, error) {
 	}
 	secretData := key.Secret()
 
-	errUpdate := s.user.Update2FA(userID, secretData)
+	errUpdate := s.user.Update2FASecret(userID, secretData)
 	if errUpdate != nil {
 		return "", errUpdate
 	}
 
 	return key.URL(), nil
+}
+
+func (s *UserService) Enable2FA(userID string) error {
+	return s.user.Enable2FA(userID)
 }
 
 func (s *UserService) GetGoogleLoginURL() string {
@@ -280,6 +290,7 @@ func (s *UserService) GoogleCallback(code string) (string, error) {
 			Email:    req.Email,
 			Name:     req.Name,
 			Password: "google-oauth-random-password",
+			Role:     "sales",
 		}
 
 		createdUser, errCreate := s.user.CreateUser(&newUser)
@@ -305,6 +316,14 @@ func (s *UserService) GoogleCallback(code string) (string, error) {
 
 func (s *UserService) GetProfile(userID string) (*entity.User, error) {
 	return s.user.FindByID(userID)
+}
+
+func (s *UserService) CheckIsManager(userID string) bool {
+	return s.user.CheckIsManager(userID)
+}
+
+func (s *UserService) ToggleOnlineStatus(userID string, isOnline bool) error {
+	return s.user.ToggleOnlineStatus(userID, isOnline)
 }
 
 func (s *UserService) GetAllUsers() ([]entity.User, error) {

@@ -52,7 +52,7 @@ func NewHandleCampaignEmailTask(
 		m.SetHeader("From", smtpConfig.From)
 		m.SetHeader("To", p.To)
 		m.SetHeader("Subject", p.Subject)
-		m.SetBody("text/html", p.Body)
+		m.SetBody("text/html", wrapHTMLTemplate(p.Body))
 
 		dialer := gomail.NewDialer(smtpConfig.Host, smtpConfig.Port, smtpConfig.Username, smtpConfig.Password)
 		sendErr := dialer.DialAndSend(m)

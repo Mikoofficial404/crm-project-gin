@@ -21,9 +21,17 @@ func ConnectWs(c *gin.Context) {
 		return
 	}
 	userID := c.MustGet("user_id").(string)
-	AppHub.Clients[userID] = conn
+
+	if AppHub.Clients[userID] == nil {
+		AppHub.Clients[userID] = make(map[*websocket.Conn]bool)
+	}
+	AppHub.Clients[userID][conn] = true
+
 	defer func() {
-		delete(AppHub.Clients, userID)
+		delete(AppHub.Clients[userID], conn)
+		if len(AppHub.Clients[userID]) == 0 {
+			delete(AppHub.Clients, userID)
+		}
 	}()
 	defer conn.Close()
 

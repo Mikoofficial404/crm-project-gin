@@ -64,13 +64,13 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 // @Failure      500 {object} response.Response
 // @Router       /products [get]
 func (h *ProductHandler) GetAllProducts(c *gin.Context) {
-	onlyActive := true
+	var isActive *bool
 	if activeStr := c.Query("active"); activeStr != "" {
 		if parsed, err := strconv.ParseBool(activeStr); err == nil {
-			onlyActive = parsed
+			isActive = &parsed
 		}
 	}
-	products, err := h.productService.GetAllProducts(onlyActive)
+	products, err := h.productService.GetAllProducts(isActive)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, response.Error(err.Error()))
 		return

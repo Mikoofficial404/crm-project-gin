@@ -28,9 +28,10 @@ type DealService struct {
 	dealProductRepo *postgres.DealProductRepository
 	dealHistoryRepo *postgres.DealHistoryRepository
 	notifRepo       *postgres.NotificationRepository
+	leadRepo        *postgres.LeadRepository
 }
 
-func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.AuditRepository, asyncClient *asynq.Client, invoiceRepo *postgres.InvoiceRepository, redisClient *redis.Client, stageRepo *postgres.PipelineStageRepository, dealProductRepo *postgres.DealProductRepository, dealHistoryRepo *postgres.DealHistoryRepository, notifRepo *postgres.NotificationRepository) *DealService {
+func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.AuditRepository, asyncClient *asynq.Client, invoiceRepo *postgres.InvoiceRepository, redisClient *redis.Client, stageRepo *postgres.PipelineStageRepository, dealProductRepo *postgres.DealProductRepository, dealHistoryRepo *postgres.DealHistoryRepository, notifRepo *postgres.NotificationRepository, leadRepo *postgres.LeadRepository) *DealService {
 	return &DealService{
 		deal:            dealRepo,
 		AuditLog:        auditRepo,
@@ -41,6 +42,7 @@ func NewDealService(dealRepo *postgres.DealRepository, auditRepo *postgres.Audit
 		dealProductRepo: dealProductRepo,
 		dealHistoryRepo: dealHistoryRepo,
 		notifRepo:       notifRepo,
+		leadRepo:        leadRepo,
 	}
 }
 
@@ -80,12 +82,24 @@ func (s *DealService) CreateDeal(name string, value float64, leadID string, user
 	return NewDeal, nil
 }
 
+func (s *DealService) GetDealByID(dealID string) (*entity.Deal, error) {
+	deal, err := s.deal.GetDealByID(dealID)
+	if err != nil {
+		return nil, errors.New("deal tidak ditemukan")
+	}
+	return deal, nil
+}
+
 func (s *DealService) GetDeals(userID string, role string, page int, limit int, search string, stageID string, pipelineID string, startDate, endDate string) ([]entity.Deal, int64, error) {
 	if role == "sales" {
 		return s.deal.GetDealByUserId(userID, page, limit, search, stageID, pipelineID, startDate, endDate)
 	} else {
 		return s.deal.GetAllDeals(page, limit, search, stageID, pipelineID, startDate, endDate)
 	}
+}
+
+func (s *DealService) GetAllInvoices() ([]entity.Invoice, error) {
+	return s.invoiceRepo.GetAllInvoices()
 }
 
 func (s *DealService) UpdateInvoiceStatus(invoideID string, status string) error {
@@ -178,6 +192,14 @@ func (s *DealService) UpdateStage(dealID string, stageID string, userID string, 
 			if err != nil {
 				return err
 			}
+		}
+
+		if deal.LeadID != "" {
+			s.leadRepo.UpdateStatus(deal.LeadID, "WON")
+		}
+	} else if err == nil && stage.IsClosedLost {
+		if deal.LeadID != "" {
+			s.leadRepo.UpdateStatus(deal.LeadID, "LOST")
 		}
 	}
 
@@ -435,6 +457,44 @@ func formatRupiah(amount float64) string {
 
 func (s *DealService) ReorderDeals(dealIDs []string) error {
 	return s.deal.UpdateDealPositions(dealIDs)
+}
+
+func (s *DealService) AssignDeal(dealID string, newAssignedTo string, userID string, role string) error {
+	if role != "admin" {
+		return errors.New("unauthorized: hanya admin yang bisa melakukan assign")
+	}
+
+	deal, err := s.deal.GetDealByID(dealID)
+	if err != nil {
+		return fmt.Errorf("deal tidak ditemukan: %w", err)
+	}
+
+	if deal.AssignedTo == newAssignedTo {
+		return nil // no change needed
+	}
+
+	errUpdate := s.deal.UpdateAssignedTo(dealID, newAssignedTo)
+	if errUpdate != nil {
+		return errUpdate
+	}
+
+	if deal.LeadID != "" {
+		s.leadRepo.UpdateAssignedTo(deal.LeadID, newAssignedTo)
+	}
+
+	websocket.SendMessageToUser(newAssignedTo, fmt.Sprintf("Anda telah ditugaskan sebuah Deal baru: %s", deal.Name))
+
+	messages := fmt.Sprintf("Mengubah pemilik Deal dari %s menjadi %s", deal.AssignedTo, newAssignedTo)
+	logData := entity.AuditLog{
+		UserIDAudit: userID,
+		Action:      messages,
+		TargetID:    dealID,
+		OldData:     deal.AssignedTo,
+		NewData:     newAssignedTo,
+	}
+	s.AuditLog.CreateAuditLog(&logData)
+
+	return nil
 }
 
 func (s *DealService) UpdateDeal(dealID string, name string, value float64, userID string, role string) error {

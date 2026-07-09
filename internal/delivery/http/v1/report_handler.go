@@ -50,7 +50,43 @@ func (h *ReportHandler) GetPipelineReport(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, response.Success("Berhasil mengambil pipeline report", result))
+
+	type StageData struct {
+		StageID    string  `json:"stage_id"`
+		StageName  string  `json:"stage_name"`
+		Name       string  `json:"name"`
+		DealsCount int64   `json:"deals_count"`
+		TotalValue float64 `json:"total_value"`
+	}
+
+	var pipelineID, pipelineName string
+	var stages []StageData
+	var totalDeals int64
+	var totalValue float64
+
+	for _, st := range result {
+		pipelineID = st.PipelineID
+		pipelineName = st.PipelineName
+		stages = append(stages, StageData{
+			StageID:    st.StageID,
+			StageName:  st.StageName,
+			Name:       st.StageName,
+			DealsCount: st.DealCount,
+			TotalValue: st.TotalValue,
+		})
+		totalDeals += st.DealCount
+		totalValue += st.TotalValue
+	}
+
+	finalResult := gin.H{
+		"pipeline_id":   pipelineID,
+		"pipeline_name": pipelineName,
+		"stages":        stages,
+		"total_deals":   totalDeals,
+		"total_value":   totalValue,
+	}
+
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil pipeline report", finalResult))
 }
 
 // @Summary      Sales performance report
@@ -86,7 +122,38 @@ func (h *ReportHandler) GetLeadSourceReport(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, response.Success("Berhasil mengambil lead source report", result))
+
+	type SourceData struct {
+		Name       string  `json:"name"`
+		Count      int64   `json:"count"`
+		Percentage float64 `json:"percentage"`
+	}
+
+	var total int64
+	var sources []SourceData
+
+	for _, rs := range result {
+		total += rs.TotalLeads
+	}
+
+	for _, rs := range result {
+		perc := float64(0)
+		if total > 0 {
+			perc = (float64(rs.TotalLeads) / float64(total)) * 100
+		}
+		sources = append(sources, SourceData{
+			Name:       rs.Source,
+			Count:      rs.TotalLeads,
+			Percentage: perc,
+		})
+	}
+
+	finalResult := gin.H{
+		"sources": sources,
+		"total":   total,
+	}
+
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil lead source report", finalResult))
 }
 
 // @Summary      Activity report
@@ -104,5 +171,32 @@ func (h *ReportHandler) GetActivityReport(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, response.Success("Berhasil mengambil activity report", result))
+
+	type ActivityData struct {
+		Type  string `json:"type"`
+		Count int64  `json:"count"`
+	}
+
+	var total int64
+	byType := make(map[string]int64)
+	var activities []ActivityData
+
+	for _, rs := range result {
+		total += rs.TotalCount
+		byType[rs.ActivityType] += rs.TotalCount
+	}
+	for k, v := range byType {
+		activities = append(activities, ActivityData{
+			Type:  k,
+			Count: v,
+		})
+	}
+
+	finalResult := gin.H{
+		"activities": activities,
+		"total":      total,
+		"by_type":    byType,
+	}
+
+	c.JSON(http.StatusOK, response.Success("Berhasil mengambil activity report", finalResult))
 }

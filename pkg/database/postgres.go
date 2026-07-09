@@ -19,7 +19,9 @@ func DBConn() *gorm.DB {
 		log.Fatal("Failed to load config:", err)
 	}
 	dsn := cfg.GetDSN()
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		DisableForeignKeyConstraintWhenMigrating: true,
+	})
 	sqlDB, err := db.DB()
 	if err != nil {
 		logrus.Fatalf("Gagal membuka database: %v", err)
@@ -38,10 +40,10 @@ func DBConn() *gorm.DB {
 func MigrateDB() error {
 
 	err := DB.AutoMigrate(
+		&entity.User{},
 		&entity.Team{},
 		&entity.Pipeline{},
 		&entity.PipelineStage{},
-		&entity.User{},
 	)
 	if err != nil {
 		return err

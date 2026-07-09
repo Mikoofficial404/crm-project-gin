@@ -27,7 +27,13 @@ func (r *DealRepository) CreateDeal(deal *entity.Deal) (*entity.Deal, error) {
 func (r *DealRepository) GetDealByID(dealID string) (*entity.Deal, error) {
 	ctx := context.Background()
 	var deal entity.Deal
-	err := r.dbGorm.WithContext(ctx).Where("id = ?", dealID).First(&deal).Error
+	err := r.dbGorm.WithContext(ctx).
+		Preload("Lead").
+		Preload("Stage").
+		Preload("Pipeline").
+		Preload("AssignedUser").
+		Where("id = ?", dealID).
+		First(&deal).Error
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +44,7 @@ func (r *DealRepository) GetAllDeals(page int, limit int, search string, stageID
 	var deals []entity.Deal
 	var total int64
 
-	query := r.dbGorm.Model(&entity.Deal{}).Preload("Lead").Preload("Stage").Preload("Pipeline")
+	query := r.dbGorm.Model(&entity.Deal{}).Preload("Lead").Preload("Stage").Preload("Pipeline").Preload("AssignedUser")
 	if search != "" {
 		query = query.Where("to_tsvector('simple', coalesce(name,'')) @@ plainto_tsquery('simple', ?)", search)
 	}
@@ -87,7 +93,8 @@ func (r *DealRepository) GetDealByUserId(userId string, page int, limit int, sea
 	var deals []entity.Deal
 	var total int64
 
-	query := r.dbGorm.Model(&entity.Deal{}).Preload("Lead").Preload("Stage").Preload("Pipeline").Where("assigned_to = ?", userId)
+	allowedUserIDsQuery := r.dbGorm.Model(&entity.User{}).Select("id").Where("id = ? OR team_id IN (SELECT id FROM teams WHERE manager_id = ?)", userId, userId)
+	query := r.dbGorm.Model(&entity.Deal{}).Preload("Lead").Preload("Stage").Preload("Pipeline").Preload("AssignedUser").Where("assigned_to IN (?)", allowedUserIDsQuery)
 	if search != "" {
 		query = query.Where("to_tsvector('simple', coalesce(name,'')) @@ plainto_tsquery('simple', ?)", search)
 	}
@@ -104,7 +111,7 @@ func (r *DealRepository) GetDealByUserId(userId string, page int, limit int, sea
 		query = query.Where("created_at <= ?", endDate+" 23:59:59")
 	}
 
-	countQuery := r.dbGorm.Model(&entity.Deal{}).Where("assigned_to = ?", userId)
+	countQuery := r.dbGorm.Model(&entity.Deal{}).Where("assigned_to IN (?)", allowedUserIDsQuery)
 	if search != "" {
 		countQuery = countQuery.Where("to_tsvector('simple', coalesce(name,'')) @@ plainto_tsquery('simple', ?)", search)
 	}
@@ -130,6 +137,10 @@ func (r *DealRepository) GetDealByUserId(userId string, page int, limit int, sea
 		return nil, 0, err
 	}
 	return deals, total, nil
+}
+
+func (r *DealRepository) UpdateAssignedTo(dealID string, assignedTo string) error {
+	return r.dbGorm.Model(&entity.Deal{}).Where("id = ?", dealID).Update("assigned_to", assignedTo).Error
 }
 
 func (r *DealRepository) UpdateStage(dealID string, stageID string) error {

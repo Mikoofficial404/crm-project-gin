@@ -46,6 +46,42 @@ func getSMPTConfig() SMTPConfig {
 	}
 }
 
+func wrapHTMLTemplate(content string) string {
+	return fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 0; color: #333333; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        .header { background: linear-gradient(135deg, #2b7fff 0%%, #1e5bb8 100%%); padding: 32px 24px; text-align: center; }
+        .header h1 { margin: 0; color: #ffffff; font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+        .content { padding: 40px 32px; line-height: 1.7; font-size: 16px; color: #374151; }
+        .content p { margin-top: 0; margin-bottom: 20px; }
+        .content a { color: #2b7fff; text-decoration: none; font-weight: 600; }
+        .content a:hover { text-decoration: underline; }
+        .footer { background-color: #f9fafb; padding: 24px; text-align: center; font-size: 13px; color: #6b7280; border-top: 1px solid #e5e7eb; }
+        .footer p { margin: 0 0 8px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>CRM Workspace</h1>
+        </div>
+        <div class="content">
+            %s
+        </div>
+        <div class="footer">
+            <p>&copy; 2026 CRM Workspace. Hak Cipta Dilindungi.</p>
+            <p>Pesan ini dikirim secara otomatis. Mohon tidak membalas email ini.</p>
+        </div>
+    </div>
+</body>
+</html>`, content)
+}
+
 func HandleSendEmailTask(ctx context.Context, t *asynq.Task) error {
 	var p EmailPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
@@ -56,7 +92,7 @@ func HandleSendEmailTask(ctx context.Context, t *asynq.Task) error {
 	m.SetHeader("From", smtpConfig.From)
 	m.SetHeader("To", p.To)
 	m.SetHeader("Subject", p.Subject)
-	m.SetBody("text/html", p.Body)
+	m.SetBody("text/html", wrapHTMLTemplate(p.Body))
 	dialer := gomail.NewDialer(smtpConfig.Host, smtpConfig.Port, smtpConfig.Username, smtpConfig.Password)
 	if err := dialer.DialAndSend(m); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)

@@ -46,8 +46,12 @@ func (s *TaskService) CreateTask(title string, description *string, dueDate *tim
 	if title == "" || assignedTo == "" {
 		return nil, errors.New("title dan assigned_to wajib diisi")
 	}
-	if dueDate != nil && dueDate.Before(time.Now()) {
-		return nil, errors.New("due_date tidak boleh di masa lalu")
+	if dueDate != nil {
+		now := time.Now()
+		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+		if dueDate.Before(today) {
+			return nil, errors.New("due_date tidak boleh di masa lalu")
+		}
 	}
 	if err := validatePriority(priority); err != nil {
 		return nil, err
@@ -146,7 +150,7 @@ func (s *TaskService) SendDueDateReminders() error {
 		}
 		title := "Pengingat Jatuh Tempo"
 		message := fmt.Sprintf("Task %s kamu jatuh tempo besok!", task.Title)
-		err = s.notif.CreateNotification(user.ID, title, message)
+		err = s.notif.CreateNotification(user.ID, title, message, "")
 		if err != nil {
 			log.Printf("SendDueDateReminders: failed to create notification for user %s: %v", user.ID, err)
 			continue
@@ -156,5 +160,5 @@ func (s *TaskService) SendDueDateReminders() error {
 			log.Printf("SendDueDateReminders: failed to mark reminder sent for task %s: %v", task.ID, err)
 		}
 	}
-	return  nil
+	return nil
 }
