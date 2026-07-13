@@ -38,8 +38,8 @@ import (
 
 	"github.com/getsentry/sentry-go"
 
-	"github.com/gin-gonic/gin"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -82,7 +82,7 @@ func main() {
 	}
 
 	r := gin.Default()
-	
+
 	// Setup CORS
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowAllOrigins = true
@@ -369,7 +369,7 @@ func main() {
 		campaignService.ProcessScheduledCampaigns()
 		rdb.Set(context.Background(), "cron:last_run:process_scheduled_campaigns", time.Now().UTC().Format(time.RFC3339), 0)
 	})
-	c.AddFunc("0 8 * * *", func() {
+	c.AddFunc("* * * * *", func() {
 		taskService.SendDueDateReminders()
 		rdb.Set(context.Background(), "cron:last_run:send_due_date_reminders", time.Now().UTC().Format(time.RFC3339), 0)
 	})

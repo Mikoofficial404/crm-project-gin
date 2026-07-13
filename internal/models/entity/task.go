@@ -17,6 +17,7 @@ type Task struct {
 	AssignedTo   string         `json:"assigned_to" gorm:"column:assigned_to;type:uuid;not null"`
 	LeadID       *string        `json:"lead_id,omitempty" gorm:"column:lead_id;type:uuid"`
 	ReminderSent bool           `json:"reminder_sent" gorm:"column:reminder_sent;not null;default:false"`
+	OverdueSent  bool           `json:"overdue_sent" gorm:"column:overdue_sent;not null;default:false"`
 	CreatedAt    time.Time      `json:"created_at" gorm:"column:created_at;autoCreateTime"`
 	UpdatedAt    time.Time      `json:"updated_at" gorm:"column:updated_at;autoUpdateTime"`
 	DeletedAt    gorm.DeletedAt `json:"-" gorm:"column:deleted_at;index"`

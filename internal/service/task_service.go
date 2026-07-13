@@ -6,7 +6,6 @@ import (
 	"crm-project/internal/repository/postgres"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 )
 
@@ -135,30 +134,41 @@ func (s *TaskService) RestoreTask(taskID string) error {
 }
 
 func (s *TaskService) SendDueDateReminders() error {
-	task, err := s.task.GetTasksDueTomorrow()
-	if err != nil {
-		return err
-	}
-	for _, task := range task {
-		if task.AssignedTo == "" {
-			continue
-		}
-		user, err := s.user.FindByID(task.AssignedTo)
-		if err != nil {
-			log.Printf("SendDueDateReminders: user not found for task %s: %v", task.ID, err)
-			continue
-		}
-		title := "Pengingat Jatuh Tempo"
-		message := fmt.Sprintf("Task %s kamu jatuh tempo besok!", task.Title)
-		err = s.notif.CreateNotification(user.ID, title, message, "")
-		if err != nil {
-			log.Printf("SendDueDateReminders: failed to create notification for user %s: %v", user.ID, err)
-			continue
-		}
-		websocket.SendMessageToUser(user.ID, message)
-		if err := s.task.MarkReminderSent(task.ID); err != nil {
-			log.Printf("SendDueDateReminders: failed to mark reminder sent for task %s: %v", task.ID, err)
+	tasksDue, err := s.task.GetTasksDueTomorrow()
+	if err == nil {
+		for _, task := range tasksDue {
+			if task.AssignedTo == "" {
+				continue
+			}
+			user, err := s.user.FindByID(task.AssignedTo)
+			if err != nil {
+				continue
+			}
+			title := "Pengingat Task (H-1)"
+			message := fmt.Sprintf("Task '%s' akan jatuh tempo dalam waktu kurang dari 24 jam!", task.Title)
+			s.notif.CreateNotification(user.ID, title, message, "")
+			websocket.SendMessageToUser(user.ID, message)
+			s.task.MarkReminderSent(task.ID)
 		}
 	}
+
+	tasksOverdue, err := s.task.GetOverdueTasks()
+	if err == nil {
+		for _, task := range tasksOverdue {
+			if task.AssignedTo == "" {
+				continue
+			}
+			user, err := s.user.FindByID(task.AssignedTo)
+			if err != nil {
+				continue
+			}
+			title := "Task Terlambat (Overdue)"
+			message := fmt.Sprintf("Task '%s' sudah melewati batas waktu jatuh tempo!", task.Title)
+			s.notif.CreateNotification(user.ID, title, message, "error")
+			websocket.SendMessageToUser(user.ID, message)
+			s.task.MarkOverdueSent(task.ID)
+		}
+	}
+
 	return nil
 }

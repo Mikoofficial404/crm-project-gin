@@ -59,11 +59,19 @@ func (r *TaskRepository) UpdateTask(taskID string, title string, description *st
 }
 
 func (r *TaskRepository) GetTasksDueTomorrow() ([]entity.Task, error) {
-	tomorrow := time.Now().Truncate(24 * time.Hour).Add(24 * time.Hour)
-	dayAfter := tomorrow.Add(24 * time.Hour)
 	var task []entity.Task
 	err := r.dbgorm.Where("status = ? AND due_date >= ? AND due_date < ? AND reminder_sent = ?",
-		"PENDING", tomorrow, dayAfter, false).Find(&task).Error
+		"PENDING", time.Now(), time.Now().Add(24*time.Hour), false).Find(&task).Error
+	if err != nil {
+		return nil, err
+	}
+	return task, nil
+}
+
+func (r *TaskRepository) GetOverdueTasks() ([]entity.Task, error) {
+	var task []entity.Task
+	err := r.dbgorm.Where("status = ? AND due_date < ? AND overdue_sent = ?",
+		"PENDING", time.Now(), false).Find(&task).Error
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +80,10 @@ func (r *TaskRepository) GetTasksDueTomorrow() ([]entity.Task, error) {
 
 func (r *TaskRepository) MarkReminderSent(taskID string) error {
 	return r.dbgorm.Model(&entity.Task{}).Where("id = ?", taskID).Update("reminder_sent", true).Error
+}
+
+func (r *TaskRepository) MarkOverdueSent(taskID string) error {
+	return r.dbgorm.Model(&entity.Task{}).Where("id = ?", taskID).Update("overdue_sent", true).Error
 }
 
 func (r *TaskRepository) DeleteTask(taskID string) error {
