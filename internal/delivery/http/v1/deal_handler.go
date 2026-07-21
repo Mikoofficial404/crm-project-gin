@@ -163,7 +163,10 @@ func (h *DealHandler) GetDealByID(c *gin.Context) {
 		return
 	}
 
-	deal, err := h.dealService.GetDealByID(dealID)
+	userID := c.MustGet("user_id").(string)
+	role := c.MustGet("role").(string)
+
+	deal, err := h.dealService.GetDealByID(dealID, userID, role)
 	if err != nil {
 		c.JSON(http.StatusNotFound, response.Error(err.Error()))
 		return

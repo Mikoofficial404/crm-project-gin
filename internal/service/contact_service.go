@@ -87,7 +87,7 @@ func (s *ContactService) GetAllContacts(page int, limit int, search string, sour
 	return s.contactRepo.FindAll(page, limit, search, source)
 }
 
-func (s *ContactService) GetContactByID(contactID string) (*entity.Contact, error) {
+func (s *ContactService) GetContactByID(contactID string, userID string, role string) (*entity.Contact, error) {
 	if contactID == "" {
 		return nil, errors.New("ID contact tidak boleh kosong")
 	}
@@ -95,7 +95,15 @@ func (s *ContactService) GetContactByID(contactID string) (*entity.Contact, erro
 	if errors.Is(err, gormErrors.ErrRecordNotFound) {
 		return nil, errors.New("contact tidak ditemukan")
 	}
-	return contact, err
+	if err != nil {
+		return nil, err
+	}
+
+	if role == "sales" && contact.AssignedTo != userID {
+		return nil, errors.New("contact tidak ditemukan")
+	}
+
+	return contact, nil
 }
 
 func (s *ContactService) UpdateContact(contactID string, updates map[string]interface{}) error {

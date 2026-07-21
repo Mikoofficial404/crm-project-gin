@@ -5,8 +5,10 @@ import (
 	"crm-project/pkg/response"
 	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,6 +17,33 @@ import (
 const (
 	MaxUploadSize = 1 << 20 // 1 MB
 )
+
+var allowedExtensions = map[string]bool{
+	".jpg":  true,
+	".jpeg": true,
+	".png":  true,
+	".gif":  true,
+	".pdf":  true,
+	".csv":  true,
+	".xlsx": true,
+	".xls":  true,
+	".docx": true,
+	".doc":  true,
+	".txt":  true,
+}
+
+var allowedMimeTypes = map[string]bool{
+	"image/jpeg":                              true,
+	"image/png":                               true,
+	"image/gif":                               true,
+	"application/pdf":                         true,
+	"text/csv":                                true,
+	"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": true,
+	"application/vnd.ms-excel":                                           true,
+	"application/vnd.openxmlformats-officedocument.wordprocessingml.document": true,
+	"application/msword":                                                     true,
+	"text/plain":                                                             true,
+}
 
 type ActivityHandler struct {
 	activityService *service.ActivityService
@@ -115,15 +144,67 @@ func (h *ActivityHandler) UploadFile(c *gin.Context) {
 		return
 	}
 
-	ext := filepath.Ext(file.Filename)
-	newFileName := fmt.Sprintf("%d%s", time.Now().Unix(), ext)
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if !allowedExtensions[ext] {
+		c.JSON(http.StatusBadRequest, response.Error("Tipe file tidak diizinkan"))
+		return
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Gagal membaca file"))
+		return
+	}
+	defer src.Close()
+
+	buffer := make([]byte, 512)
+	_, err = src.Read(buffer)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Gagal membaca file"))
+		return
+	}
+	mimeType := http.DetectContentType(buffer)
+	if !allowedMimeTypes[mimeType] {
+		c.JSON(http.StatusBadRequest, response.Error("Tipe file tidak diizinkan"))
+		return
+	}
+
+	newFileName := fmt.Sprintf("%d%s", time.Now().UnixMilli(), ext)
 	dst := filepath.Join("./uploads", newFileName)
 
 	if err := c.SaveUploadedFile(file, dst); err != nil {
 		c.JSON(http.StatusInternalServerError, response.Error("Gagal menyimpan file"))
 		return
 	}
-	c.JSON(http.StatusOK, response.Success("Upload berhasil", gin.H{"url": "/uploads/" + newFileName}))
+	c.JSON(http.StatusOK, response.Success("Upload berhasil", gin.H{"file_id": newFileName}))
+}
+
+// @Summary      Download file
+// @Tags         Activities
+// @Produce      octet-stream
+// @Security     BearerAuth
+// @Param        file_id path string true "File ID"
+// @Success      200 {file} file
+// @Failure      404 {object} response.Response
+// @Router       /files/{file_id} [get]
+func (h *ActivityHandler) DownloadFile(c *gin.Context) {
+	fileID := c.Param("file_id")
+
+	ext := filepath.Ext(fileID)
+	if ext == "" || !allowedExtensions[strings.ToLower(ext)] {
+		c.JSON(http.StatusBadRequest, response.Error("File tidak valid"))
+		return
+	}
+
+	cleanName := filepath.Base(fileID)
+	filePath := filepath.Join("./uploads", cleanName)
+
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, response.Error("File tidak ditemukan"))
+		return
+	}
+
+	c.File(filePath)
 }
 
 // @Summary      Update aktivitas

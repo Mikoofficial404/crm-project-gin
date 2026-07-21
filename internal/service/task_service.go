@@ -76,8 +76,17 @@ func (s *TaskService) GetAllTasks(userID string, role string, priority string, c
 	return s.task.GetAll(userID, role, priority, category)
 }
 
-func (s *TaskService) GetTaskByID(taskID string) (*entity.Task, error) {
-	return s.task.GetByID(taskID)
+func (s *TaskService) GetTaskByID(taskID string, userID string, role string) (*entity.Task, error) {
+	task, err := s.task.GetByID(taskID)
+	if err != nil {
+		return nil, err
+	}
+
+	if role == "sales" && task.AssignedTo != userID {
+		return nil, errors.New("task tidak ditemukan")
+	}
+
+	return task, nil
 }
 
 func (s *TaskService) UpdateTask(taskID string, title string, description *string, dueDate *time.Time, priority string, category string, userID string, role string) error {

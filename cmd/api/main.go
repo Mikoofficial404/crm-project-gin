@@ -85,7 +85,12 @@ func main() {
 
 	// Setup CORS
 	corsConfig := cors.DefaultConfig()
-	corsConfig.AllowAllOrigins = true
+	corsConfig.AllowOrigins = []string{
+		os.Getenv("CORS_ORIGIN"),
+	}
+	if corsConfig.AllowOrigins[0] == "" {
+		corsConfig.AllowOrigins = []string{"http://localhost:5173"}
+	}
 	corsConfig.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization", "X-Requested-With", "Accept"}
 	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"}
 	r.Use(cors.New(corsConfig))
@@ -93,15 +98,30 @@ func main() {
 	r.Use(middleware.RequestIDMiddleware())
 	r.Use(middleware.SentryMiddleware())
 	r.Use(middleware.PrometheusMiddleware())
-
-	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	r.Use(middleware.SecurityHeadersMiddleware())
 
 	metrics.Init()
 
-	r.Static("/uploads", "./uploads")
-	clientAsynq := asynq.NewClient(asynq.RedisClientOpt{Addr: "localhost:6380"})
+	if os.Getenv("APP_ENV") == "development" {
+		r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
+
+	redisAddr := os.Getenv("REDIS_HOST") + ":" + os.Getenv("REDIS_PORT")
+	if os.Getenv("REDIS_HOST") == "" {
+		redisAddr = "localhost:6380"
+	}
+	redisPassword := os.Getenv("REDIS_PASSWORD")
+
+	clientAsynq := asynq.NewClient(asynq.RedisClientOpt{
+		Addr:     redisAddr,
+		Password: redisPassword,
+	})
 	srvAsynq := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: "localhost:6380"},
+		asynq.RedisClientOpt{
+			Addr:     redisAddr,
+			Password: redisPassword,
+		},
 		asynq.Config{Concurrency: 10},
 	)
 
@@ -195,15 +215,16 @@ func main() {
 
 	r.POST("/api/v1/auth/forgot-password", authHandler.ForgotPassword)
 	r.POST("/api/v1/auth/reset-password", authHandler.ResetPassword)
+	r.POST("/api/v1/auth/refresh", authHandler.RefreshToken)
 	r.POST("/api/v1/register", authHandler.Register)
 	r.POST("/api/v1/login", middleware.RateLimitMiddleware(rdb), authHandler.Login)
 	r.POST("/api/v1/login/verify-otp", authHandler.VerifyOTP)
+	r.POST("/api/v1/login/recovery", authHandler.VerifyRecoveryCode)
 	r.GET("/api/v1/auth/google/login", authHandler.LoginGoogle)
 	r.GET("/api/v1/auth/google/callback", authHandler.CallbackGoogle)
 
 	healthHandler := v1.NewHealthHandler(database.GetDB(), rdb)
 	r.GET("/health", healthHandler.Check)
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	aiService := service.NewAIService(os.Getenv("GEMINI_API_KEY"))
 
@@ -213,6 +234,7 @@ func main() {
 	r.POST("/api/v1/webhook/whatsapp", middleware.WebhookAuthMiddleware(), webhookHandler.ReceiveWhatsApp)
 	protected := r.Group("/api/v1")
 	protected.Use(middleware.AuthMiddleware(rdb))
+	protected.Use(middleware.RateLimitUser(rdb))
 
 	protected.POST("/logout", authHandler.Logout)
 	protected.GET("/me", authHandler.GetMe)
@@ -262,6 +284,7 @@ func main() {
 	protected.PUT("/activities/:id", activityHandler.UpdateActivity)
 	protected.DELETE("/activities/:id", middleware.RoleMiddleware("admin"), activityHandler.DeleteActivity)
 	protected.POST("/upload", activityHandler.UploadFile)
+	protected.GET("/files/:file_id", activityHandler.DownloadFile)
 
 	protected.GET("/search", searchHandler.GlobalSearch)
 

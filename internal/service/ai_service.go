@@ -54,7 +54,7 @@ Nama Klien yang sedang Anda ajak bicara: %s
 - Gunakan sapaan "Bapak/Ibu" diikuti nama Klien.
 - Jawab dengan singkat, padat, dan persuasif (Maksimal 3-4 kalimat). Klien tidak suka membaca teks panjang di WhatsApp.
 - Gunakan format list/bullet point jika menjelaskan lebih dari 2 hal.
-- Gunakan emoji secara sangat profesional (maksimal 1-2 emoji per pesan).`, clientName)
+- Gunakan emoji secara sangat profesional (maksimal 1-2 emoji per pesan).`, clientName, clientName)
 
 	prompt := fmt.Sprintf("%s\n\n--- PESAN DARI KLIEN ---\n%s", systemPrompt, clientMessages)
 	resp, err := model.GenerateContent(ctx, genai.Text(prompt))

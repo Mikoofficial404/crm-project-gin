@@ -78,16 +78,32 @@ func (s *UserService) Register(email string, name string, password string) (*ent
 func (s *UserService) Login(email string, password string, ip string, reqUser string) (token string, userID string, requires2FA bool, err error) {
 	isUser, err := s.user.FindByEmail(email)
 	if err != nil {
-		return "", "", false, fmt.Errorf("user not found")
+		return "", "", false, fmt.Errorf("email atau password salah")
+	}
+
+	lockKey := "lockout:" + isUser.ID
+	ctx := context.Background()
+	locked, _ := s.rdb.Exists(ctx, lockKey).Result()
+	if locked > 0 {
+		ttl, _ := s.rdb.TTL(ctx, lockKey).Result()
+		return "", "", false, fmt.Errorf("akun terkunci, coba lagi dalam %.0f menit", ttl.Minutes())
 	}
 
 	jwtCheck, err := jwt.CheckPasswordHash(password, isUser.Password)
-	if err != nil {
-		return "", "", false, fmt.Errorf("password check failed")
+	if err != nil || !jwtCheck {
+		failKey := "failed_login:" + isUser.ID
+		failCount, _ := s.rdb.Incr(ctx, failKey).Result()
+		s.rdb.Expire(ctx, failKey, 15*time.Minute)
+
+		if failCount >= 5 {
+			s.rdb.Set(ctx, lockKey, "1", 15*time.Minute)
+			return "", "", false, fmt.Errorf("akun terkunci, coba lagi dalam 15 menit")
+		}
+
+		return "", "", false, fmt.Errorf("email atau password salah")
 	}
-	if !jwtCheck {
-		return "", "", false, fmt.Errorf("incorrect password")
-	}
+
+	s.rdb.Del(ctx, "failed_login:"+isUser.ID)
 
 	if isUser.IsTwoFactorEnabled {
 		return "", isUser.ID, true, nil
@@ -114,7 +130,6 @@ func (s *UserService) Login(email string, password string, ip string, reqUser st
 	tokenHash := hex.EncodeToString(hashBytes[:])
 
 	expiry := time.Duration(time.Hour * 24 * 7)
-	ctx := context.Background()
 	if err := s.rdb.Set(ctx, "refresh:"+tokenHash, isUser.ID, expiry).Err(); err != nil {
 		return "", "", false, fmt.Errorf("failed to save refresh token")
 	}
@@ -210,29 +225,35 @@ func (s *UserService) ResetPassword(token string, newPassword string) error {
 	return delTokens.Err()
 }
 
-func (s *UserService) VerifyOTP(userID string, otpCode string) (string, error) {
+func (s *UserService) VerifyOTP(userID string, otpCode string) (string, string, error) {
 	user, err := s.user.FindByID(userID)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	valid := totp.Validate(otpCode, user.TwoFactorSecret)
 	if !valid {
-		return "", fmt.Errorf("kode OTP salah atau kedaluwarsa")
+		return "", "", fmt.Errorf("kode OTP salah atau kedaluwarsa")
 	}
 	parseUUID, err := uuid.Parse(userID)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse UUID")
+		return "", "", fmt.Errorf("failed to parse UUID")
 	}
 	jwtSecret := os.Getenv("JWT_SECRET")
-	jwtMake, err := jwt.MakeJWT(parseUUID, user.Role, jwtSecret, time.Hour*24)
+	accessToken, err := jwt.MakeJWT(parseUUID, user.Role, jwtSecret, time.Hour*24)
 	if err != nil {
-		return "", fmt.Errorf("failed to create JWT token")
+		return "", "", fmt.Errorf("failed to create JWT token")
 	}
 
-	// Update last_login
-	s.user.UpdateLastLogin(userID)
+	rawToken := make([]byte, 32)
+	rand.Read(rawToken)
+	refreshToken := hex.EncodeToString(rawToken)
+	hashBytes := sha256.Sum256([]byte(refreshToken))
+	tokenHash := hex.EncodeToString(hashBytes[:])
+	ctx := context.Background()
+	s.rdb.Set(ctx, "refresh:"+tokenHash, userID, time.Duration(time.Hour*24*7))
 
-	return jwtMake, nil
+	s.user.UpdateLastLogin(userID)
+	return accessToken, refreshToken, nil
 }
 
 func (s *UserService) SetUp2FA(userID string) (string, error) {
@@ -255,15 +276,98 @@ func (s *UserService) SetUp2FA(userID string) (string, error) {
 	return key.URL(), nil
 }
 
-func (s *UserService) Enable2FA(userID string) error {
-	return s.user.Enable2FA(userID)
+func (s *UserService) Enable2FA(userID string) (*GenerateRecoveryCodes, error) {
+	if err := s.user.Enable2FA(userID); err != nil {
+		return nil, err
+	}
+
+	codes := make([]string, 8)
+	hashedCodes := make([]string, 8)
+	for i := 0; i < 8; i++ {
+		raw := make([]byte, 8)
+		rand.Read(raw)
+		codes[i] = hex.EncodeToString(raw)
+		hash := sha256.Sum256([]byte(codes[i]))
+		hashedCodes[i] = hex.EncodeToString(hash[:])
+	}
+
+	ctx := context.Background()
+	data, _ := json.Marshal(hashedCodes)
+	key := "recovery:" + userID
+	s.rdb.Set(ctx, key, string(data), 0)
+
+	return &GenerateRecoveryCodes{Codes: codes}, nil
 }
 
-func (s *UserService) GetGoogleLoginURL() string {
-	return GoogleOAuthConfig.AuthCodeURL("random-state-123")
+func (s *UserService) VerifyRecoveryCode(userID string, code string) (string, error) {
+	ctx := context.Background()
+	data, err := s.rdb.Get(ctx, "recovery:"+userID).Result()
+	if err != nil {
+		return "", fmt.Errorf("recovery codes tidak ditemukan")
+	}
+
+	var hashedCodes []string
+	json.Unmarshal([]byte(data), &hashedCodes)
+
+	codeHash := sha256.Sum256([]byte(code))
+	codeHashStr := hex.EncodeToString(codeHash[:])
+
+	found := -1
+	for i, h := range hashedCodes {
+		if h == codeHashStr {
+			found = i
+			break
+		}
+	}
+	if found == -1 {
+		return "", fmt.Errorf("kode recovery tidak valid")
+	}
+
+	hashedCodes = append(hashedCodes[:found], hashedCodes[found+1:]...)
+	newData, _ := json.Marshal(hashedCodes)
+	s.rdb.Set(ctx, "recovery:"+userID, string(newData), 0)
+
+	user, err := s.user.FindByID(userID)
+	if err != nil {
+		return "", err
+	}
+	parseUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse UUID")
+	}
+	jwtSecret := os.Getenv("JWT_SECRET")
+	jwtMake, err := jwt.MakeJWT(parseUUID, user.Role, jwtSecret, time.Hour*24)
+	if err != nil {
+		return "", fmt.Errorf("failed to create JWT token")
+	}
+
+	s.user.UpdateLastLogin(userID)
+	return jwtMake, nil
 }
 
-func (s *UserService) GoogleCallback(code string) (string, error) {
+type GenerateRecoveryCodes struct {
+	Codes []string
+}
+
+func (s *UserService) GetGoogleLoginURL() (string, error) {
+	stateBytes := make([]byte, 16)
+	rand.Read(stateBytes)
+	state := hex.EncodeToString(stateBytes)
+
+	ctx := context.Background()
+	if err := s.rdb.Set(ctx, "oauth_state:"+state, "1", 10*time.Minute).Err(); err != nil {
+		return "", fmt.Errorf("gagal menyimpan state OAuth")
+	}
+
+	return GoogleOAuthConfig.AuthCodeURL(state), nil
+}
+
+func (s *UserService) GoogleCallback(code string, state string) (string, error) {
+	ctx := context.Background()
+	if _, err := s.rdb.Get(ctx, "oauth_state:"+state).Result(); err != nil {
+		return "", fmt.Errorf("state OAuth tidak valid atau expired")
+	}
+	s.rdb.Del(ctx, "oauth_state:"+state)
 
 	goggleTokens, err := GoogleOAuthConfig.Exchange(context.Background(), code)
 	if err != nil {
@@ -350,4 +454,44 @@ func (s *UserService) GetLoginHistory(userID string, limit int) ([]entity.LoginH
 		limit = 10
 	}
 	return s.loginHistory.GetLoginHistoriesByUserID(userID, limit)
+}
+
+func (s *UserService) RefreshToken(refreshToken string) (string, string, error) {
+	hashBytes := sha256.Sum256([]byte(refreshToken))
+	tokenHash := hex.EncodeToString(hashBytes[:])
+
+	ctx := context.Background()
+	userID, err := s.rdb.Get(ctx, "refresh:"+tokenHash).Result()
+	if err != nil {
+		return "", "", fmt.Errorf("refresh token invalid atau expired")
+	}
+
+	s.rdb.Del(ctx, "refresh:"+tokenHash)
+
+	user, err := s.user.FindByID(userID)
+	if err != nil {
+		return "", "", fmt.Errorf("user tidak ditemukan")
+	}
+
+	parseUUID, err := uuid.Parse(userID)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to parse UUID")
+	}
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	accessToken, err := jwt.MakeJWT(parseUUID, user.Role, jwtSecret, time.Hour*24)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to create JWT token")
+	}
+
+	rawToken := make([]byte, 32)
+	rand.Read(rawToken)
+	newRefreshToken := hex.EncodeToString(rawToken)
+
+	newHashBytes := sha256.Sum256([]byte(newRefreshToken))
+	newTokenHash := hex.EncodeToString(newHashBytes[:])
+	expiry := time.Duration(time.Hour * 24 * 7)
+	s.rdb.Set(ctx, "refresh:"+newTokenHash, userID, expiry)
+
+	return accessToken, newRefreshToken, nil
 }

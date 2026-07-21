@@ -1,5 +1,7 @@
 package response
 
+import "github.com/sirupsen/logrus"
+
 type Response struct {
 	Success bool        `json:"success"`
 	Message string      `json:"message"`
@@ -31,6 +33,15 @@ func Error(message string) Response {
 	return Response{
 		Success: false,
 		Message: message,
+		Data:    nil,
+	}
+}
+
+func ServerError(err error, userMessage string) Response {
+	logrus.WithError(err).Error(userMessage)
+	return Response{
+		Success: false,
+		Message: userMessage,
 		Data:    nil,
 	}
 }

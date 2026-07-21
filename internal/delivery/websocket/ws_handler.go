@@ -3,6 +3,8 @@ package websocket
 import (
 	"log"
 	"net/http"
+	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -10,7 +12,12 @@ import (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		allowed := os.Getenv("CORS_ORIGIN")
+		if allowed == "" {
+			allowed = "http://localhost:5173"
+		}
+		origin := r.Header.Get("Origin")
+		return origin == "" || origin == allowed || strings.HasPrefix(origin, allowed)
 	},
 }
 

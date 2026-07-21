@@ -146,8 +146,17 @@ func (s *LeadService) GetLeads(userID string, role string, page int, limit int, 
 	}
 }
 
-func (s *LeadService) GetLeadByID(leadID string) (*entity.Lead, error) {
-	return s.lead.GetLeadByID(leadID)
+func (s *LeadService) GetLeadByID(leadID string, userID string, role string) (*entity.Lead, error) {
+	lead, err := s.lead.GetLeadByID(leadID)
+	if err != nil {
+		return nil, err
+	}
+
+	if role == "sales" && lead.AssignedTo != userID {
+		return nil, errors.New("lead tidak ditemukan")
+	}
+
+	return lead, nil
 }
 
 func (s *LeadService) UpdateLeadStatus(leadID string, status string, userID string, role string) error {

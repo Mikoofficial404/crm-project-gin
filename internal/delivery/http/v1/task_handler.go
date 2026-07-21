@@ -99,7 +99,9 @@ func (h *TaskHandler) GetAllTasks(c *gin.Context) {
 // @Router       /tasks/{id} [get]
 func (h *TaskHandler) GetTaskByID(c *gin.Context) {
 	taskID := c.Param("id")
-	data, err := h.taskService.GetTaskByID(taskID)
+	userID := c.MustGet("user_id").(string)
+	role := c.MustGet("role").(string)
+	data, err := h.taskService.GetTaskByID(taskID, userID, role)
 	if err != nil {
 		c.JSON(http.StatusNotFound, response.Error("Task tidak ditemukan"))
 		return
@@ -127,7 +129,7 @@ func (h *TaskHandler) UpdateTask(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
 	role := c.MustGet("role").(string)
 
-	existingTask, errTask := h.taskService.GetTaskByID(taskID)
+	existingTask, errTask := h.taskService.GetTaskByID(taskID, userID, role)
 	if errTask != nil {
 		c.JSON(http.StatusNotFound, response.Error("Task tidak ditemukan"))
 		return

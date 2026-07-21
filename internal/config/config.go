@@ -31,6 +31,14 @@ func LoadConfig() (*AppConfig, error) {
 }
 
 func (c *AppConfig) GetDSN() string {
-	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		c.DBHOST, c.DBPORT, c.DBUSER, c.DBPASS, c.DBNAME)
+	sslMode := os.Getenv("DB_SSLMODE")
+	if sslMode == "" {
+		if os.Getenv("APP_ENV") == "production" {
+			sslMode = "require"
+		} else {
+			sslMode = "disable"
+		}
+	}
+	return fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		c.DBHOST, c.DBPORT, c.DBUSER, c.DBPASS, c.DBNAME, sslMode)
 }

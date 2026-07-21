@@ -13,8 +13,12 @@ func WebhookAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		secret := os.Getenv("WEBHOOK_SECRET")
 
-		// Kalau WEBHOOK_SECRET tidak di-set, lewati validasi (development mode)
 		if secret == "" {
+			if os.Getenv("APP_ENV") == "production" {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "WEBHOOK_SECRET tidak dikonfigurasi"})
+				c.Abort()
+				return
+			}
 			c.Next()
 			return
 		}

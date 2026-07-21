@@ -7,11 +7,15 @@ import (
 	"crm-project/pkg/response"
 	"encoding/csv"
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
+
+const ImportCSVMaxSize = 10 << 20 // 10 MB
 
 type LeadHandler struct {
 	leadService    *service.LeadService
@@ -175,7 +179,10 @@ func (h *LeadHandler) GetLeadByID(c *gin.Context) {
 		return
 	}
 
-	data, err := h.leadService.GetLeadByID(leadID)
+	userID := c.MustGet("user_id").(string)
+	role := c.MustGet("role").(string)
+
+	data, err := h.leadService.GetLeadByID(leadID, userID, role)
 	if err != nil {
 		c.JSON(http.StatusNotFound, response.Error("Lead tidak ditemukan"))
 		return
@@ -306,11 +313,25 @@ func (h *LeadHandler) ReplyWhatsApp(c *gin.Context) {
 // @Router      /leads/import [post]
 func (h *LeadHandler) ImportCSV(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
+
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, ImportCSVMaxSize)
+	if err := c.Request.ParseMultipartForm(ImportCSVMaxSize); err != nil {
+		c.JSON(http.StatusRequestEntityTooLarge, response.Error("File terlalu besar (maks 10MB)"))
+		return
+	}
+
 	file, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
+
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if ext != ".csv" {
+		c.JSON(http.StatusBadRequest, response.Error("Hanya file CSV yang diizinkan"))
+		return
+	}
+
 	src, err := file.Open()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, response.Error(err.Error()))

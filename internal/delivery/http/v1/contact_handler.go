@@ -5,7 +5,9 @@ import (
 	"crm-project/pkg/response"
 	"encoding/csv"
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -112,8 +114,10 @@ func (h *ContactHandler) GetAllContacts(c *gin.Context) {
 // @Router      /contacts/{id} [get]
 func (h *ContactHandler) GetContactByID(c *gin.Context) {
 	id := c.Param("id")
+	userID := c.MustGet("user_id").(string)
+	role := c.MustGet("role").(string)
 
-	data, err := h.contactService.GetContactByID(id)
+	data, err := h.contactService.GetContactByID(id, userID, role)
 	if err != nil {
 		if err.Error() == "contact tidak ditemukan" {
 			c.JSON(http.StatusNotFound, response.Error(err.Error()))
@@ -292,9 +296,21 @@ func (h *ContactHandler) ExportContactsCSV(c *gin.Context) {
 func (h *ContactHandler) ImportContactsCSV(c *gin.Context) {
 	userID := c.MustGet("user_id").(string)
 
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, ImportCSVMaxSize)
+	if err := c.Request.ParseMultipartForm(ImportCSVMaxSize); err != nil {
+		c.JSON(http.StatusRequestEntityTooLarge, response.Error("File terlalu besar (maks 10MB)"))
+		return
+	}
+
 	file, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, response.Error("file tidak ditemukan"))
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if ext != ".csv" {
+		c.JSON(http.StatusBadRequest, response.Error("Hanya file CSV yang diizinkan"))
 		return
 	}
 

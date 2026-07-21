@@ -82,11 +82,16 @@ func (s *DealService) CreateDeal(name string, value float64, leadID string, user
 	return NewDeal, nil
 }
 
-func (s *DealService) GetDealByID(dealID string) (*entity.Deal, error) {
+func (s *DealService) GetDealByID(dealID string, userID string, role string) (*entity.Deal, error) {
 	deal, err := s.deal.GetDealByID(dealID)
 	if err != nil {
 		return nil, errors.New("deal tidak ditemukan")
 	}
+
+	if role == "sales" && deal.AssignedTo != userID {
+		return nil, errors.New("deal tidak ditemukan")
+	}
+
 	return deal, nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"crm-project/pkg/response"
 	"fmt"
 	"net/http"
+	"unicode"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,7 +24,7 @@ func NewUserHandler(userService *service.UserService) *UserHandler {
 type RegisterRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Name     string `json:"name" binding:"required"`
-	Password string `json:"password" binding:"required,min=6"`
+	Password string `json:"password" binding:"required,min=8"`
 }
 
 type LoginRequest struct {
@@ -45,6 +46,41 @@ type ResetPasswordRequest struct {
 	NewPassword string `json:"new_password" binding:"required"`
 }
 
+func validatePasswordComplexity(password string) error {
+	if len(password) < 8 {
+		return fmt.Errorf("password minimal 8 karakter")
+	}
+
+	var hasUpper, hasLower, hasNumber, hasSymbol bool
+	for _, ch := range password {
+		switch {
+		case unicode.IsUpper(ch):
+			hasUpper = true
+		case unicode.IsLower(ch):
+			hasLower = true
+		case unicode.IsNumber(ch):
+			hasNumber = true
+		case unicode.IsPunct(ch) || unicode.IsSymbol(ch):
+			hasSymbol = true
+		}
+	}
+
+	if !hasUpper {
+		return fmt.Errorf("password harus mengandung huruf besar")
+	}
+	if !hasLower {
+		return fmt.Errorf("password harus mengandung huruf kecil")
+	}
+	if !hasNumber {
+		return fmt.Errorf("password harus mengandung angka")
+	}
+	if !hasSymbol {
+		return fmt.Errorf("password harus mengandung simbol")
+	}
+
+	return nil
+}
+
 // Register godoc
 // @Summary     Register user baru
 // @Description Daftarkan user baru ke sistem
@@ -58,6 +94,10 @@ type ResetPasswordRequest struct {
 func (h *UserHandler) Register(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
+		return
+	}
+	if err := validatePasswordComplexity(req.Password); err != nil {
 		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
@@ -102,7 +142,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, response.Success("Login berhasil", gin.H{"token": token}))
+	c.JSON(http.StatusOK, response.Success("Login berhasil", gin.H{"token": token, "refresh_token": userID}))
 }
 
 // Logout godoc
@@ -174,11 +214,8 @@ func (h *UserHandler) ForgotPassword(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	if err := h.userService.ForgotPassword(req.Email); err != nil {
-		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
-		return
-	}
-	c.JSON(http.StatusOK, response.Success("Email reset password telah dikirim", nil))
+	h.userService.ForgotPassword(req.Email)
+	c.JSON(http.StatusOK, response.Success("Jika email terdaftar, link reset password telah dikirim", nil))
 }
 
 // ResetPassword godoc
@@ -220,12 +257,41 @@ func (h *UserHandler) VerifyOTP(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	data, err := h.userService.VerifyOTP(req.UserID, req.OTPCode)
+	data, tokenRefresh, err := h.userService.VerifyOTP(req.UserID, req.OTPCode)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, response.Success("Verifikasi OTP berhasil", gin.H{"token": data}))
+	c.JSON(http.StatusOK, response.Success("Verifikasi OTP berhasil", gin.H{"token": data, "refresh_token": tokenRefresh}))
+}
+
+// RefreshToken godoc
+// @Summary     Refresh token
+// @Description Tukar refresh token untuk access token baru
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Param       body body map[string]string true "refresh_token"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /auth/refresh [post]
+func (h *UserHandler) RefreshToken(c *gin.Context) {
+	var req struct {
+		RefreshToken string `json:"refresh_token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error("refresh_token wajib diisi"))
+		return
+	}
+	token, newRefreshToken, err := h.userService.RefreshToken(req.RefreshToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, response.Error(err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, response.Success("Token berhasil diperbarui", gin.H{
+		"token":         token,
+		"refresh_token": newRefreshToken,
+	}))
 }
 
 // Setup2FA godoc
@@ -256,27 +322,61 @@ func (h *UserHandler) Verify2FASetup(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, response.Error("OTP code wajib diisi"))
 		return
 	}
-	_, err := h.userService.VerifyOTP(userID, req.OTPCode)
+	_, _, err := h.userService.VerifyOTP(userID, req.OTPCode)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, response.Error("Kode OTP tidak valid"))
 		return
 	}
-	err = h.userService.Enable2FA(userID)
+	recovery, err := h.userService.Enable2FA(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, response.Error("Gagal mengaktifkan 2FA"))
 		return
 	}
-	c.JSON(http.StatusOK, response.Success("2FA berhasil diverifikasi dan diaktifkan", nil))
+	c.JSON(http.StatusOK, response.Success("2FA berhasil diaktifkan", gin.H{
+		"recovery_codes": recovery.Codes,
+	}))
+}
+
+// VerifyRecoveryCode godoc
+// @Summary     Login dengan recovery code 2FA
+// @Description Gunakan recovery code untuk login jika authenticator hilang
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Param       body body map[string]string true "user_id dan recovery_code"
+// @Success     200 {object} response.Response
+// @Failure     400 {object} response.Response
+// @Router      /login/recovery [post]
+func (h *UserHandler) VerifyRecoveryCode(c *gin.Context) {
+	var req struct {
+		UserID       string `json:"user_id" binding:"required"`
+		RecoveryCode string `json:"recovery_code" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, response.Error("user_id dan recovery_code wajib diisi"))
+		return
+	}
+	token, err := h.userService.VerifyRecoveryCode(req.UserID, req.RecoveryCode)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.Error(err.Error()))
+		return
+	}
+	c.JSON(http.StatusOK, response.Success("Login dengan recovery code berhasil", gin.H{"token": token}))
 }
 
 func (h *UserHandler) LoginGoogle(c *gin.Context) {
-	url := h.userService.GetGoogleLoginURL()
+	url, err := h.userService.GetGoogleLoginURL()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.Error("Gagal memulai OAuth login"))
+		return
+	}
 	c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
 func (h *UserHandler) CallbackGoogle(c *gin.Context) {
 	code := c.Query("code")
-	token, err := h.userService.GoogleCallback(code)
+	state := c.Query("state")
+	token, err := h.userService.GoogleCallback(code, state)
 	if err != nil {
 		c.Redirect(http.StatusTemporaryRedirect, "http://localhost:5173/basic-login?error="+err.Error())
 		return

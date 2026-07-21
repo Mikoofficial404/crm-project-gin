@@ -6,11 +6,11 @@ services:
     container_name: crm_postgres
     restart: always
     environment:
-      POSTGRES_USER: crm_user
-      POSTGRES_PASSWORD: crm_password
-      POSTGRES_DB: crm_db
+      POSTGRES_USER: ${DB_USER:-crm_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_DB: ${DB_NAME:-crm_db}
     ports:
-      - "5433:5432"
+      - "${DB_PORT:-5433}:5432"
     volumes:
       - crm-pg-data:/var/lib/postgresql/data
     networks:
@@ -20,8 +20,9 @@ services:
     image: redis:7-alpine
     container_name: crm_redis
     restart: always
+    command: redis-server --requirepass ${REDIS_PASSWORD:-changeme}
     ports:
-      - "6380:6379"
+      - "${REDIS_PORT:-6380}:6379"
     volumes:
       - crm-redis-data:/data
     networks:
@@ -48,8 +49,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-changeme}
     volumes:
       - crm-grafana-data:/var/lib/grafana
     depends_on:
