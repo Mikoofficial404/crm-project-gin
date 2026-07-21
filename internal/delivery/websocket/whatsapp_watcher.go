@@ -48,7 +48,11 @@ func connectAndListen() error {
 		case websocket.TextMessage:
 			logrus.WithField("payload", string(payload)).Debug("[GowaWatcher] Text Message received")
 			go func(data []byte) {
-				_, err := http.Post("http://localhost:8080/api/v1/webhook/whatsapp", "application/json", bytes.NewBuffer(data))
+				appURL := os.Getenv("APP_URL")
+				if appURL == "" {
+					appURL = "http://localhost:8080"
+				}
+				_, err := http.Post(appURL+"/api/v1/webhook/whatsapp", "application/json", bytes.NewBuffer(data))
 				if err != nil {
 					logrus.WithError(err).Error("[GowaWatcher] Error forwarding to webhook")
 				}

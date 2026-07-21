@@ -30,7 +30,7 @@ type GoogleUserInfo struct {
 }
 
 var GoogleOAuthConfig = &oauth2.Config{
-	RedirectURL: "http://localhost:8080/api/v1/auth/google/callback",
+	RedirectURL: "", // di-set di NewUserService dari APP_URL
 	Scopes: []string{
 		"https://www.googleapis.com/auth/userinfo.email",
 		"https://www.googleapis.com/auth/userinfo.profile",

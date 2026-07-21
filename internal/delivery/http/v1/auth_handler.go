@@ -6,6 +6,7 @@ import (
 	"crm-project/pkg/response"
 	"fmt"
 	"net/http"
+	"os"
 	"unicode"
 
 	"github.com/gin-gonic/gin"
@@ -378,10 +379,18 @@ func (h *UserHandler) CallbackGoogle(c *gin.Context) {
 	state := c.Query("state")
 	token, err := h.userService.GoogleCallback(code, state)
 	if err != nil {
-		c.Redirect(http.StatusTemporaryRedirect, "http://localhost:5173/basic-login?error="+err.Error())
+		c.Redirect(http.StatusTemporaryRedirect, getFrontendURL()+"/basic-login?error="+err.Error())
 		return
 	}
-	c.Redirect(http.StatusTemporaryRedirect, "http://localhost:5173/basic-login?token="+token)
+	c.Redirect(http.StatusTemporaryRedirect, getFrontendURL()+"/basic-login?token="+token)
+}
+
+func getFrontendURL() string {
+	url := os.Getenv("FRONTEND_URL")
+	if url == "" {
+		return "http://localhost:5173"
+	}
+	return url
 }
 
 // GetMe godoc
