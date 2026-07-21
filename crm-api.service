@@ -1,0 +1,62 @@
+[Unit]
+Description=Miko Tech CRM API
+After=network.target postgresql.service redis.service
+
+[Service]
+Type=simple
+User=crm
+WorkingDirectory=/opt/crm-project
+ExecStart=/opt/crm-project/crm-api
+Restart=always
+RestartSec=5
+
+# Production Environment
+Environment="APP_ENV=production"
+Environment="APP_PORT=8080"
+Environment="APP_URL=https://api.domain-kamu.com"
+Environment="FRONTEND_URL=https://domain-kamu.com"
+Environment="CORS_ORIGIN=https://domain-kamu.com"
+
+# Database
+Environment="DB_HOST=127.0.0.1"
+Environment="DB_PORT=5432"
+Environment="DB_USER=crm_user"
+Environment="DB_PASSWORD=your-db-password"
+Environment="DB_NAME=crm_db"
+Environment="DB_SSLMODE=require"
+
+# Redis
+Environment="REDIS_HOST=127.0.0.1"
+Environment="REDIS_PORT=6379"
+Environment="REDIS_PASSWORD=your-redis-password"
+
+# JWT
+Environment="JWT_SECRET=your-jwt-secret"
+
+# Google OAuth
+Environment="GOOGLE_CLIENT_ID=your-google-client-id"
+Environment="GOOGLE_CLIENT_SECRET=your-google-client-secret"
+
+# Gemini AI
+Environment="GEMINI_API_KEY=your-gemini-api-key"
+
+# SMTP
+Environment="SMTP_HOST=your-smtp-host"
+Environment="SMTP_PORT=587"
+Environment="SMTP_USERNAME=your-smtp-username"
+Environment="SMTP_PASSWORD=your-smtp-password"
+Environment="SMTP_FROM=noreply@domain-kamu.com"
+
+# WhatsApp Gateway
+Environment="WA_GOWA_URL=https://your-wa-gateway-url"
+Environment="WA_DEVICE_ID=your-wa-device-id"
+Environment="WA_BASIC_AUTH=your-wa-basic-auth"
+
+# Webhook
+Environment="WEBHOOK_SECRET=your-webhook-secret"
+
+# Sentry
+Environment="SENTRY_DSN=your-sentry-dsn"
+
+[Install]
+WantedBy=multi-user.target
