@@ -14,6 +14,12 @@
 # Dependency directories (remove the comment below to include it)
 vendor/
 
+# Compiled Go binaries
+api
+main
+crm-api
+*.db
+
 # Environment Variables
 .env
 .env.local
